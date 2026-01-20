@@ -1,9 +1,0 @@
-{
-  "is-main": true,
-  "import": [
-    {
-      "path": "mizchi/moonbit_template",
-      "alias": "lib"
-    }
-  ]
-}

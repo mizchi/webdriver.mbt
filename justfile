@@ -21,7 +21,7 @@ test-update:
 
 # Run main
 run:
-    moon run cmd/main
+    moon run src/main
 
 # Generate type definition files
 info:

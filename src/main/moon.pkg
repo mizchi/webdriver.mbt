@@ -1,0 +1,5 @@
+import { "mizchi/lib" as @lib }
+
+options(
+  "is-main": true,
+)
