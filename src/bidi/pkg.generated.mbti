@@ -1,0 +1,140 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/webdriver.mbt/bidi"
+
+// Values
+pub fn parse_incoming(String) -> Result[BidiIncoming, String]
+
+// Errors
+
+// Types and methods
+pub struct BidiClient {
+  transport : Transport
+  mut next_id : Int
+  mut connected : Bool
+  pending : Map[Int, BidiResponse]
+  event_handlers : Array[(BidiEvent) -> Unit]
+}
+pub async fn BidiClient::browser_close(Self) -> Result[Unit, ClientError]
+pub async fn BidiClient::browser_create_user_context(Self) -> Result[String, ClientError]
+pub async fn BidiClient::browser_get_user_contexts(Self) -> Result[Array[String], ClientError]
+pub async fn BidiClient::browser_remove_user_context(Self, String) -> Result[Unit, ClientError]
+pub async fn BidiClient::browsing_context_close(Self, String) -> Result[Unit, ClientError]
+pub async fn BidiClient::browsing_context_create(Self, String, user_context? : String) -> Result[String, ClientError]
+pub async fn BidiClient::browsing_context_get_tree(Self) -> Result[Json, ClientError]
+pub async fn BidiClient::browsing_context_locate_nodes(Self, String, Json) -> Result[Json, ClientError]
+pub async fn BidiClient::browsing_context_navigate(Self, String, String, wait? : String) -> Result[NavigationResult, ClientError]
+pub async fn BidiClient::browsing_context_reload(Self, String) -> Result[Unit, ClientError]
+pub fn BidiClient::close(Self) -> Result[Unit, ClientError]
+pub async fn BidiClient::connect(Self) -> Result[Unit, ClientError]
+pub async fn BidiClient::input_perform_actions(Self, Array[Json], context_id? : String) -> Result[Unit, ClientError]
+pub async fn BidiClient::input_release_actions(Self, context_id? : String) -> Result[Unit, ClientError]
+pub async fn BidiClient::network_add_data_collector(Self) -> Result[Unit, ClientError]
+pub async fn BidiClient::network_set_cache_behavior(Self, String, contexts? : Array[String]) -> Result[Unit, ClientError]
+pub fn BidiClient::new(Transport) -> Self
+pub fn BidiClient::on_event(Self, (BidiEvent) -> Unit) -> Unit
+pub async fn BidiClient::script_call_function(Self, String, String, arguments? : Array[Json], await_promise? : Bool) -> Result[Json, ClientError]
+pub async fn BidiClient::script_evaluate(Self, String, String, await_promise? : Bool) -> Result[Json, ClientError]
+pub async fn BidiClient::send(Self, String, params? : Json?) -> Result[Json, ClientError]
+pub async fn BidiClient::session_end(Self) -> Result[Unit, ClientError]
+pub async fn BidiClient::session_new(Self, capabilities? : Json?) -> Result[SessionInfo, ClientError]
+pub async fn BidiClient::session_status(Self) -> Result[SessionStatus, ClientError]
+pub async fn BidiClient::session_subscribe(Self, Array[String]) -> Result[Unit, ClientError]
+pub async fn BidiClient::session_unsubscribe(Self, Array[String]) -> Result[Unit, ClientError]
+
+pub struct BidiError {
+  error : String
+  message : String
+  stacktrace : String
+}
+pub impl Show for BidiError
+
+pub struct BidiEvent {
+  event_method : String
+  params : Json
+}
+pub impl Show for BidiEvent
+
+pub enum BidiIncoming {
+  Response(BidiResponse)
+  Event(BidiEvent)
+}
+pub impl Show for BidiIncoming
+
+pub struct BidiRequest {
+  id : Int
+  method_name : String
+  params : Json?
+}
+pub fn BidiRequest::to_json(Self) -> String
+pub impl Show for BidiRequest
+
+pub struct BidiResponse {
+  id : Int
+  result : Json?
+  error : BidiError?
+}
+pub impl Show for BidiResponse
+
+pub enum ClientError {
+  Transport(TransportError)
+  ParseError(message~ : String)
+  ResponseError(error~ : BidiError)
+}
+pub impl Show for ClientError
+
+pub struct CustomTransport {
+  connect : () -> Result[Unit, TransportError]
+  send : (String) -> Result[Unit, TransportError]
+  recv : () -> Result[String, TransportError]
+  close : () -> Result[Unit, TransportError]
+}
+pub fn CustomTransport::new(() -> Result[Unit, TransportError], (String) -> Result[Unit, TransportError], () -> Result[String, TransportError], () -> Result[Unit, TransportError]) -> Self
+
+pub struct JsWebSocketState {
+  url : String
+  socket_id : Ref[Int?]
+  closed : Ref[Bool]
+}
+
+pub struct NavigationResult {
+  navigation : String
+  url : String
+}
+pub impl Show for NavigationResult
+
+pub struct SessionInfo {
+  session_id : String
+  capabilities : Json?
+}
+pub impl Show for SessionInfo
+
+pub struct SessionStatus {
+  ready : Bool
+  message : String?
+}
+pub impl Show for SessionStatus
+
+pub enum Transport {
+  JsWebSocket(JsWebSocketState)
+  Custom(CustomTransport)
+  Unsupported(TransportError)
+}
+pub fn Transport::close(Self) -> Result[Unit, TransportError]
+pub async fn Transport::connect(Self) -> Result[Unit, TransportError]
+pub fn Transport::custom(CustomTransport) -> Self
+pub async fn Transport::recv(Self) -> Result[String, TransportError]
+pub async fn Transport::send(Self, String) -> Result[Unit, TransportError]
+pub fn Transport::unsupported(String) -> Self
+pub fn Transport::websocket(String) -> Self
+
+pub enum TransportError {
+  NotSupported(message~ : String)
+  NetworkError(message~ : String)
+  Closed
+}
+pub impl Show for TransportError
+
+// Type aliases
+
+// Traits
+

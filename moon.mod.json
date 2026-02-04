@@ -1,5 +1,5 @@
 {
-  "name": "mizchi/lib",
+  "name": "mizchi/webdriver.mbt",
   "version": "0.1.0",
   "deps": {
     "moonbitlang/async": "0.16.2"
@@ -7,8 +7,12 @@
   "source": "src",
   "preferred-target": "js",
   "readme": "README.mbt.md",
-  "repository": "",
+  "repository": "https://github.com/mizchi/webdriver.mbt",
   "license": "Apache-2.0",
-  "keywords": [],
-  "description": ""
+  "keywords": [
+    "webdriver",
+    "bidi",
+    "client"
+  ],
+  "description": "WebDriver BiDi client library for MoonBit"
 }

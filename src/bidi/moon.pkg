@@ -1,0 +1,14 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/js_async",
+  "moonbitlang/async/websocket" as @websocket,
+  "moonbitlang/core/json",
+}
+
+options(
+  targets: {
+    "e2e_test.mbt": [ "js" ],
+    "transport_js.mbt": [ "js", "wasm", "wasm-gc" ],
+    "transport_native.mbt": [ "native" ],
+  },
+)
