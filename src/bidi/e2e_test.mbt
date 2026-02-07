@@ -3,14 +3,16 @@
 
 ///|
 extern "js" fn ws_server_start(port : Int) -> @js_async.Promise[Int] =
-  #| (port) => {
+  #| async (port) => {
   #|   const http = require('http');
   #|   const crypto = require('crypto');
+  #|   const { chromium } = require('playwright');
   #|   if (typeof WebSocket === 'undefined') {
   #|     try { globalThis.WebSocket = require('undici').WebSocket; } catch (_) {}
   #|   }
   #|   const state = {
   #|     server: null,
+  #|     browser: null,
   #|     sockets: new Set(),
   #|     contexts: new Map(),
   #|     nextContextId: 1,
@@ -98,19 +100,24 @@ extern "js" fn ws_server_start(port : Int) -> @js_async.Promise[Int] =
   #|     if (arg.type === 'null') return null;
   #|     return undefined;
   #|   };
-  #|   const handleMessage = (socket, msg) => {
+  #|   const handleMessage = async (socket, msg) => {
   #|     let req = null;
   #|     try { req = JSON.parse(msg); } catch (_) { return; }
   #|     const id = req.id;
   #|     const method = req.method;
   #|     const params = req.params || {};
   #|     const respond = (result) => sendJson(socket, { id, type: 'success', result });
+  #|     const findContext = () => {
+  #|       const contextId = (params.target && params.target.context) || params.context || null;
+  #|       if (!contextId) return null;
+  #|       return state.contexts.get(contextId) || null;
+  #|     };
   #|     if (method === 'session.status') {
   #|       respond({ ready: true, message: 'ok' });
   #|       return;
   #|     }
   #|     if (method === 'session.new') {
-  #|       respond({ sessionId: 'sid-' + id, capabilities: { browserName: 'stub' } });
+  #|       respond({ sessionId: 'sid-' + id, capabilities: { browserName: 'chromium' } });
   #|       return;
   #|     }
   #|     if (method === 'session.subscribe') {
@@ -146,63 +153,139 @@ extern "js" fn ws_server_start(port : Int) -> @js_async.Promise[Int] =
   #|       return;
   #|     }
   #|     if (method === 'browser.close') {
+  #|       for (const [cid, info] of state.contexts) {
+  #|         try { await info.browserContext.close(); } catch (_) {}
+  #|         state.contexts.delete(cid);
+  #|       }
+  #|       if (state.browser) {
+  #|         try { await state.browser.close(); } catch (_) {}
+  #|         state.browser = null;
+  #|       }
   #|       respond({});
   #|       return;
   #|     }
   #|     if (method === 'browsingContext.create') {
   #|       const idStr = 'ctx-' + state.nextContextId++;
-  #|       state.contexts.set(idStr, { url: 'about:blank', userContext: params.userContext || 'default' });
+  #|       const userContext = params.userContext || 'default';
+  #|       const browserContext = await state.browser.newContext();
+  #|       const page = await browserContext.newPage();
+  #|       state.contexts.set(idStr, { url: page.url(), userContext, browserContext, page });
   #|       respond({ context: idStr });
   #|       return;
   #|     }
   #|     if (method === 'browsingContext.reload') {
+  #|       const info = findContext();
+  #|       if (info) {
+  #|         try { await info.page.reload({ waitUntil: 'load' }); } catch (_) {}
+  #|         info.url = info.page.url();
+  #|       }
   #|       respond({});
   #|       return;
   #|     }
   #|     if (method === 'browsingContext.close') {
-  #|       if (params.context) {
-  #|         state.contexts.delete(params.context);
+  #|       const contextId = params.context || null;
+  #|       if (contextId && state.contexts.has(contextId)) {
+  #|         const info = state.contexts.get(contextId);
+  #|         try { await info.browserContext.close(); } catch (_) {}
+  #|         state.contexts.delete(contextId);
   #|       }
   #|       respond({});
   #|       return;
   #|     }
   #|     if (method === 'browsingContext.getTree') {
-  #|       const contexts = Array.from(state.contexts.entries()).map(([cid, info]) => ({
-  #|         context: cid,
-  #|         url: info.url,
-  #|         userContext: info.userContext,
-  #|       }));
+  #|       const contexts = [];
+  #|       for (const [cid, info] of state.contexts.entries()) {
+  #|         contexts.push({
+  #|           context: cid,
+  #|           url: info.page ? info.page.url() : info.url,
+  #|           userContext: info.userContext,
+  #|         });
+  #|       }
   #|       respond({ contexts });
   #|       return;
   #|     }
   #|     if (method === 'browsingContext.navigate') {
-  #|       const ctx = params.context;
+  #|       const contextId = params.context || null;
   #|       const url = params.url || '';
-  #|       if (ctx && state.contexts.has(ctx)) {
-  #|         state.contexts.get(ctx).url = url;
+  #|       const info = contextId ? state.contexts.get(contextId) : null;
+  #|       if (info && info.page) {
+  #|         const wait = params.wait || 'complete';
+  #|         const waitUntil = wait === 'interactive' ? 'domcontentloaded' : 'load';
+  #|         try { await info.page.goto(url, { waitUntil }); } catch (_) {}
+  #|         info.url = info.page.url();
   #|       }
-  #|       respond({ navigation: 'nav-' + id, url });
+  #|       sendEvent(socket, 'browsingContext.load', { context: contextId });
+  #|       respond({ navigation: 'nav-' + id, url: info ? info.url : url });
+  #|       return;
+  #|     }
+  #|     if (method === 'browsingContext.captureScreenshot') {
+  #|       const info = findContext();
+  #|       let data = '';
+  #|       if (info && info.page) {
+  #|         const shot = await info.page.screenshot({ type: params.format === 'image/jpeg' ? 'jpeg' : 'png' });
+  #|         data = shot.toString('base64');
+  #|       }
+  #|       respond({ data });
   #|       return;
   #|     }
   #|     if (method === 'browsingContext.locateNodes') {
-  #|       respond({ nodes: [] });
+  #|       const info = findContext();
+  #|       let nodes = [];
+  #|       const locator = params.locator || {};
+  #|       if (info && info.page && locator.type === 'css' && typeof locator.value === 'string') {
+  #|         let count = 0;
+  #|         try { count = await info.page.$$eval(locator.value, (elements) => elements.length); } catch (_) {}
+  #|         nodes = Array.from({ length: count }).map((_, i) => ({ sharedId: `node-${i}` }));
+  #|       }
+  #|       respond({ nodes });
   #|       return;
   #|     }
   #|     if (method === 'script.evaluate') {
   #|       const expr = params.expression || '';
+  #|       const info = findContext();
   #|       let value = undefined;
-  #|       try { value = eval(expr); } catch (_) { value = undefined; }
+  #|       if (info && info.page) {
+  #|         try { value = await info.page.evaluate((source) => (0, eval)(source), expr); } catch (_) {}
+  #|       } else {
+  #|         try { value = (0, eval)(expr); } catch (_) {}
+  #|       }
   #|       respond({ result: toRemoteValue(value) });
   #|       return;
   #|     }
   #|     if (method === 'script.callFunction') {
   #|       const decl = params.functionDeclaration || '';
-  #|       let fn = null;
-  #|       try { fn = eval(decl); } catch (_) { fn = null; }
   #|       const args = Array.isArray(params.arguments) ? params.arguments.map(fromRemoteValue) : [];
+  #|       const info = findContext();
   #|       let value = undefined;
-  #|       try { value = fn ? fn(...args) : undefined; } catch (_) { value = undefined; }
+  #|       if (info && info.page) {
+  #|         try {
+  #|           value = await info.page.evaluate(
+  #|             ({ declaration, values }) => {
+  #|               let fn = null;
+  #|               try { fn = (0, eval)(declaration); } catch (_) {}
+  #|               try { return fn ? fn(...values) : undefined; } catch (_) { return undefined; }
+  #|             },
+  #|             { declaration: decl, values: args }
+  #|           );
+  #|         } catch (_) {}
+  #|       } else {
+  #|         let fn = null;
+  #|         try { fn = (0, eval)(decl); } catch (_) {}
+  #|         try { value = fn ? fn(...args) : undefined; } catch (_) {}
+  #|       }
   #|       respond({ result: toRemoteValue(value) });
+  #|       return;
+  #|     }
+  #|     if (method === 'script.addPreloadScript') {
+  #|       respond({ script: 'preload-' + id });
+  #|       return;
+  #|     }
+  #|     if (method === 'script.removePreloadScript') {
+  #|       respond({});
+  #|       return;
+  #|     }
+  #|     if (method === 'script.disown') {
+  #|       respond({});
   #|       return;
   #|     }
   #|     if (method === 'input.performActions') {
@@ -214,6 +297,7 @@ extern "js" fn ws_server_start(port : Int) -> @js_async.Promise[Int] =
   #|       return;
   #|     }
   #|     if (method === 'network.setCacheBehavior') {
+  #|       sendEvent(socket, 'network.beforeRequestSent', { request: { url: 'about:blank' } });
   #|       respond({});
   #|       return;
   #|     }
@@ -242,13 +326,16 @@ extern "js" fn ws_server_start(port : Int) -> @js_async.Promise[Int] =
   #|     state.sockets.add(socket);
   #|     let buf = Buffer.alloc(0);
   #|     socket.on('data', (chunk) => {
-  #|       buf = decodeFrames(socket, Buffer.concat([buf, chunk]), (msg) => handleMessage(socket, msg));
+  #|       buf = decodeFrames(socket, Buffer.concat([buf, chunk]), (msg) => {
+  #|         handleMessage(socket, msg).catch(() => {});
+  #|       });
   #|     });
   #|     socket.on('close', () => {
   #|       state.sockets.delete(socket);
   #|     });
   #|   });
-  #|   return new Promise((resolve, reject) => {
+  #|   state.browser = await chromium.launch({ headless: true });
+  #|   return await new Promise((resolve, reject) => {
   #|     server.listen(port, '127.0.0.1', () => {
   #|       state.server = server;
   #|       globalThis.__mbt_bidi_server = state;
@@ -261,16 +348,19 @@ extern "js" fn ws_server_start(port : Int) -> @js_async.Promise[Int] =
 
 ///|
 extern "js" fn ws_server_stop() -> @js_async.Promise[Unit] =
-  #| () => {
+  #| async () => {
   #|   const state = globalThis.__mbt_bidi_server;
-  #|   if (!state || !state.server) return Promise.resolve();
+  #|   if (!state || !state.server) return;
   #|   for (const sock of state.sockets) {
   #|     try { sock.end(); } catch (_) {}
   #|   }
-  #|   return new Promise((resolve) => {
+  #|   await new Promise((resolve) => {
   #|     state.server.close(() => resolve());
-  #|     globalThis.__mbt_bidi_server = null;
   #|   });
+  #|   if (state.browser) {
+  #|     try { await state.browser.close(); } catch (_) {}
+  #|   }
+  #|   globalThis.__mbt_bidi_server = null;
   #| }
 
 ///|
@@ -366,9 +456,10 @@ async test "bidi e2e" {
       }
     Err(_) => assert_true(false)
   }
-  let nav = client.browsing_context_navigate(ctx, "https://example.com")
+  let page_url = "data:text/html,<title>mbt-e2e</title><body><h1 id='app'>ok</h1></body>"
+  let nav = client.browsing_context_navigate(ctx, page_url)
   match nav {
-    Ok(result) => inspect(result.url, content="https://example.com")
+    Ok(result) => assert_true(result.url.has_prefix("data:text/html,"))
     Err(_) => assert_true(false)
   }
   let _ = client.browsing_context_reload(ctx)
@@ -379,26 +470,31 @@ async test "bidi e2e" {
   match locate_nodes {
     Ok(json) =>
       match e2e_get_array_field(json, "nodes") {
-        Some(nodes) => assert_true(nodes.length() == 0)
+        Some(nodes) => assert_true(nodes.length() >= 1)
         None => assert_true(false)
       }
     Err(_) => assert_true(false)
   }
-  let eval_result = client.script_evaluate("1 + 2", ctx)
+  let eval_result = client.script_evaluate("document.title", ctx)
   match eval_result {
     Ok(json) =>
       match e2e_get_object_field(json, "result") {
         Some(obj) =>
           match e2e_get_string_field(obj, "type") {
-            Some("number") =>
-              match e2e_get_number_field(obj, "value") {
-                Some(v) => inspect(v.to_int(), content="3")
+            Some("string") =>
+              match e2e_get_string_field(obj, "value") {
+                Some(v) => inspect(v, content="mbt-e2e")
                 None => assert_true(false)
               }
             _ => assert_true(false)
           }
         None => assert_true(false)
       }
+    Err(_) => assert_true(false)
+  }
+  let screenshot = client.browsing_context_capture_screenshot(ctx)
+  match screenshot {
+    Ok(data) => assert_true(not(data.is_empty()))
     Err(_) => assert_true(false)
   }
   let args : Array[Json] = [e2e_make_number_arg(6.0), e2e_make_number_arg(7.0)]
