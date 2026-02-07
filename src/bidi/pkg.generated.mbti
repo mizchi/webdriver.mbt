@@ -39,6 +39,34 @@ pub fn ActionSequence::pointer(String, PointerType, Array[InputAction]) -> Self
 pub fn ActionSequence::to_json(Self) -> Json
 pub impl Show for ActionSequence
 
+pub struct Backend {
+  navigate : (String, String, String) -> Result[NavigationResult, BackendError]
+  evaluate : (String, String, Bool) -> Result[Json, BackendError]
+  locate_nodes : (String, Json, Int?) -> Result[Array[NodeReference], BackendError]
+  perform_actions : (String?, Array[Json]) -> Result[Unit, BackendError]
+  release_actions : (String?) -> Result[Unit, BackendError]
+  capture_screenshot : (String, String?) -> Result[String, BackendError]
+  capabilities : () -> BackendCapabilities
+}
+pub fn Backend::new((String, String, String) -> Result[NavigationResult, BackendError], (String, String, Bool) -> Result[Json, BackendError], (String, Json, Int?) -> Result[Array[NodeReference], BackendError], (String?, Array[Json]) -> Result[Unit, BackendError], (String?) -> Result[Unit, BackendError], (String, String?) -> Result[String, BackendError], () -> BackendCapabilities) -> Self
+
+pub struct BackendCapabilities {
+  navigation : Bool
+  evaluate : Bool
+  element_lookup : Bool
+  input_actions : Bool
+  screenshot : Bool
+}
+pub impl Eq for BackendCapabilities
+pub impl Show for BackendCapabilities
+
+pub enum BackendError {
+  InvalidArgument(message~ : String)
+  NotFound(message~ : String)
+}
+pub impl Eq for BackendError
+pub impl Show for BackendError
+
 pub struct BidiClient {
   transport : Transport
   mut next_id : Int
@@ -154,6 +182,20 @@ pub struct CustomTransport {
   close : () -> Result[Unit, TransportError]
 }
 pub fn CustomTransport::new(() -> Result[Unit, TransportError], (String) -> Result[Unit, TransportError], () -> Result[String, TransportError], () -> Result[Unit, TransportError]) -> Self
+
+pub struct InMemoryBackend {
+  state : Ref[InMemoryBackendState]
+}
+pub fn InMemoryBackend::action_log_length(Self) -> Int
+pub fn InMemoryBackend::get_context_url(Self, String) -> String?
+pub fn InMemoryBackend::new(initial_contexts? : Array[String]) -> Self
+pub fn InMemoryBackend::to_backend(Self) -> Backend
+
+pub struct InMemoryBackendState {
+  mut next_navigation_id : Int
+  contexts : Map[String, String]
+  action_log : Array[String]
+}
 
 pub struct InnerTextLocator {
   text : String

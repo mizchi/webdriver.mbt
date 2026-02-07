@@ -26,8 +26,8 @@ Scope: protocol parsing + spec behavior, independent of any browser backend.
 - [x] `log.entryAdded` event emission and filtering.
 
 ## Backend contract
-- [ ] Define a backend trait/interface for: navigation, evaluate, element lookup, input actions, screenshots, and capability reporting.
-- [ ] Provide minimal in-memory/mock backend for unit tests.
+- [x] Define a backend trait/interface for: navigation, evaluate, element lookup, input actions, screenshots, and capability reporting.
+- [x] Provide minimal in-memory/mock backend for unit tests.
 
 ## Tests
 - [x] Unit tests for codec + validation.
