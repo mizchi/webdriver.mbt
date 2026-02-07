@@ -60,6 +60,7 @@ pub async fn BidiClient::browsing_context_navigate(Self, String, String, wait? :
 pub async fn BidiClient::browsing_context_reload(Self, String) -> Result[Unit, ClientError]
 pub fn BidiClient::close(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::connect(Self) -> Result[Unit, ClientError]
+pub async fn BidiClient::dispatch(Self, String, String, params? : Json?) -> Result[Json, ClientError]
 pub async fn BidiClient::input_perform_actions(Self, Array[Json], context_id? : String) -> Result[Unit, ClientError]
 pub async fn BidiClient::input_perform_actions_typed(Self, Array[ActionSequence], context_id? : String) -> Result[Unit, ClientError]
 pub async fn BidiClient::input_release_actions(Self, context_id? : String) -> Result[Unit, ClientError]
@@ -68,10 +69,16 @@ pub async fn BidiClient::network_add_data_collector_typed(Self, NetworkDataColle
 pub async fn BidiClient::network_set_cache_behavior(Self, String, contexts? : Array[String]) -> Result[Unit, ClientError]
 pub async fn BidiClient::network_set_cache_behavior_typed(Self, CacheBehavior, contexts? : Array[String]) -> Result[Unit, ClientError]
 pub fn BidiClient::new(Transport) -> Self
+pub fn BidiClient::on_browser_event(Self, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_browsing_context_event(Self, (BidiEvent) -> Unit) -> Unit
 pub fn BidiClient::on_event(Self, (BidiEvent) -> Unit) -> Unit
 pub fn BidiClient::on_event_method(Self, String, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_input_event(Self, (BidiEvent) -> Unit) -> Unit
 pub fn BidiClient::on_log_entry_added(Self, level? : String, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_log_event(Self, (BidiEvent) -> Unit) -> Unit
 pub fn BidiClient::on_network_event(Self, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_script_event(Self, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_session_event(Self, (BidiEvent) -> Unit) -> Unit
 pub async fn BidiClient::script_add_preload_script(Self, String, arguments? : Array[RemoteValue], contexts? : Array[String], user_contexts? : Array[String], sandbox? : String) -> Result[String, ClientError]
 pub async fn BidiClient::script_call_function(Self, String, String, arguments? : Array[Json], await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool, this_value? : Json) -> Result[Json, ClientError]
 pub async fn BidiClient::script_call_function_typed(Self, String, String, arguments? : Array[RemoteValue], await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool, this_value? : RemoteValue) -> Result[Json, ClientError]

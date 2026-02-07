@@ -41,6 +41,71 @@ pub fn BidiClient::on_event_method(
 }
 
 ///|
+/// Register handler for session.* events
+pub fn BidiClient::on_session_event(
+  self : BidiClient,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method.has_prefix("session.") {
+      handler(evt)
+    }
+  })
+}
+
+///|
+/// Register handler for browser.* events
+pub fn BidiClient::on_browser_event(
+  self : BidiClient,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method.has_prefix("browser.") {
+      handler(evt)
+    }
+  })
+}
+
+///|
+/// Register handler for browsingContext.* events
+pub fn BidiClient::on_browsing_context_event(
+  self : BidiClient,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method.has_prefix("browsingContext.") {
+      handler(evt)
+    }
+  })
+}
+
+///|
+/// Register handler for script.* events
+pub fn BidiClient::on_script_event(
+  self : BidiClient,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method.has_prefix("script.") {
+      handler(evt)
+    }
+  })
+}
+
+///|
+/// Register handler for input.* events
+pub fn BidiClient::on_input_event(
+  self : BidiClient,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method.has_prefix("input.") {
+      handler(evt)
+    }
+  })
+}
+
+///|
 /// Register handler for network.* events
 pub fn BidiClient::on_network_event(
   self : BidiClient,
@@ -54,13 +119,26 @@ pub fn BidiClient::on_network_event(
 }
 
 ///|
+/// Register handler for log.* events
+pub fn BidiClient::on_log_event(
+  self : BidiClient,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method.has_prefix("log.") {
+      handler(evt)
+    }
+  })
+}
+
+///|
 /// Register handler for log.entryAdded (optional level filter)
 pub fn BidiClient::on_log_entry_added(
   self : BidiClient,
   level? : String,
   handler : (BidiEvent) -> Unit,
 ) -> Unit {
-  self.on_event(fn(evt : BidiEvent) {
+  self.on_log_event(fn(evt : BidiEvent) {
     if evt.event_method != "log.entryAdded" {
       return ()
     }
@@ -136,11 +214,29 @@ pub async fn BidiClient::send(
 }
 
 ///|
+/// Dispatch request through the domain router
+pub async fn BidiClient::dispatch(
+  self : BidiClient,
+  domain : String,
+  command : String,
+  params? : Json? = None,
+) -> Result[Json, ClientError] {
+  if not(is_supported_domain_command(domain, command)) {
+    return Err(
+      InvalidArgument(
+        message="Unsupported command for " + domain + ": " + command,
+      ),
+    )
+  }
+  self.send(domain + "." + command, params~)
+}
+
+///|
 /// Session: status
 pub async fn BidiClient::session_status(
   self : BidiClient,
 ) -> Result[SessionStatus, ClientError] {
-  let result = self.send("session.status")
+  let result = self.dispatch("session", "status")
   match result {
     Ok(json) =>
       match get_bool_field(json, "ready") {
@@ -164,9 +260,9 @@ pub async fn BidiClient::session_new(
     Some(caps) => {
       let params : Map[String, Json] = {}
       params["capabilities"] = caps
-      self.send("session.new", params=Some(Json::object(params)))
+      self.dispatch("session", "new", params=Some(Json::object(params)))
     }
-    None => self.send("session.new")
+    None => self.dispatch("session", "new")
   }
   match result {
     Ok(json) =>
@@ -193,7 +289,8 @@ pub async fn BidiClient::session_subscribe(
   }
   let params : Map[String, Json] = {}
   params["events"] = Json::array(json_events)
-  match self.send("session.subscribe", params=Some(Json::object(params))) {
+  match
+    self.dispatch("session", "subscribe", params=Some(Json::object(params))) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -211,7 +308,8 @@ pub async fn BidiClient::session_unsubscribe(
   }
   let params : Map[String, Json] = {}
   params["events"] = Json::array(json_events)
-  match self.send("session.unsubscribe", params=Some(Json::object(params))) {
+  match
+    self.dispatch("session", "unsubscribe", params=Some(Json::object(params))) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -222,7 +320,7 @@ pub async fn BidiClient::session_unsubscribe(
 pub async fn BidiClient::session_end(
   self : BidiClient,
 ) -> Result[Unit, ClientError] {
-  match self.send("session.end") {
+  match self.dispatch("session", "end") {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -233,7 +331,7 @@ pub async fn BidiClient::session_end(
 pub async fn BidiClient::browser_get_user_contexts(
   self : BidiClient,
 ) -> Result[Array[String], ClientError] {
-  let result = self.send("browser.getUserContexts")
+  let result = self.dispatch("browser", "getUserContexts")
   match result {
     Ok(json) =>
       match get_array_field(json, "userContexts") {
@@ -258,7 +356,7 @@ pub async fn BidiClient::browser_get_user_contexts(
 pub async fn BidiClient::browser_create_user_context(
   self : BidiClient,
 ) -> Result[String, ClientError] {
-  let result = self.send("browser.createUserContext")
+  let result = self.dispatch("browser", "createUserContext")
   match result {
     Ok(json) =>
       match get_string_field(json, "userContext") {
@@ -278,7 +376,11 @@ pub async fn BidiClient::browser_remove_user_context(
   let params : Map[String, Json] = {}
   params["userContext"] = Json::string(user_context)
   match
-    self.send("browser.removeUserContext", params=Some(Json::object(params))) {
+    self.dispatch(
+      "browser",
+      "removeUserContext",
+      params=Some(Json::object(params)),
+    ) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -289,7 +391,7 @@ pub async fn BidiClient::browser_remove_user_context(
 pub async fn BidiClient::browser_close(
   self : BidiClient,
 ) -> Result[Unit, ClientError] {
-  match self.send("browser.close") {
+  match self.dispatch("browser", "close") {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -308,8 +410,9 @@ pub async fn BidiClient::browsing_context_create(
     Some(u) => params["userContext"] = Json::string(u)
     None => ()
   }
-  let result = self.send(
-    "browsingContext.create",
+  let result = self.dispatch(
+    "browsingContext",
+    "create",
     params=Some(Json::object(params)),
   )
   match result {
@@ -330,7 +433,12 @@ pub async fn BidiClient::browsing_context_reload(
 ) -> Result[Unit, ClientError] {
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
-  match self.send("browsingContext.reload", params=Some(Json::object(params))) {
+  match
+    self.dispatch(
+      "browsingContext",
+      "reload",
+      params=Some(Json::object(params)),
+    ) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -344,7 +452,8 @@ pub async fn BidiClient::browsing_context_close(
 ) -> Result[Unit, ClientError] {
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
-  match self.send("browsingContext.close", params=Some(Json::object(params))) {
+  match
+    self.dispatch("browsingContext", "close", params=Some(Json::object(params))) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -377,9 +486,13 @@ pub async fn BidiClient::browsing_context_get_tree(
     None => ()
   }
   if has_params {
-    self.send("browsingContext.getTree", params=Some(Json::object(params)))
+    self.dispatch(
+      "browsingContext",
+      "getTree",
+      params=Some(Json::object(params)),
+    )
   } else {
-    self.send("browsingContext.getTree")
+    self.dispatch("browsingContext", "getTree")
   }
 }
 
@@ -398,8 +511,9 @@ pub async fn BidiClient::browsing_context_navigate(
   params["context"] = Json::string(context_id)
   params["url"] = Json::string(url)
   params["wait"] = Json::string(wait)
-  let result = self.send(
-    "browsingContext.navigate",
+  let result = self.dispatch(
+    "browsingContext",
+    "navigate",
     params=Some(Json::object(params)),
   )
   match result {
@@ -448,8 +562,9 @@ pub async fn BidiClient::browsing_context_capture_screenshot(
     Some(value) => params["clip"] = value
     None => ()
   }
-  let result = self.send(
-    "browsingContext.captureScreenshot",
+  let result = self.dispatch(
+    "browsingContext",
+    "captureScreenshot",
     params=Some(Json::object(params)),
   )
   match result {
@@ -482,7 +597,11 @@ pub async fn BidiClient::browsing_context_locate_nodes(
     Some(opts) => params["serializationOptions"] = opts.to_json()
     None => ()
   }
-  self.send("browsingContext.locateNodes", params=Some(Json::object(params)))
+  self.dispatch(
+    "browsingContext",
+    "locateNodes",
+    params=Some(Json::object(params)),
+  )
 }
 
 ///|
@@ -505,7 +624,11 @@ pub async fn BidiClient::browsing_context_locate_nodes_typed(
     Some(opts) => params["serializationOptions"] = opts.to_json()
     None => ()
   }
-  self.send("browsingContext.locateNodes", params=Some(Json::object(params)))
+  self.dispatch(
+    "browsingContext",
+    "locateNodes",
+    params=Some(Json::object(params)),
+  )
 }
 
 ///|
@@ -536,7 +659,7 @@ pub async fn BidiClient::script_evaluate(
     Some(active) => params["userActivation"] = Json::boolean(active)
     None => ()
   }
-  self.send("script.evaluate", params=Some(Json::object(params)))
+  self.dispatch("script", "evaluate", params=Some(Json::object(params)))
 }
 
 ///|
@@ -574,7 +697,7 @@ pub async fn BidiClient::script_call_function(
     Some(value) => params["this"] = value
     None => ()
   }
-  self.send("script.callFunction", params=Some(Json::object(params)))
+  self.dispatch("script", "callFunction", params=Some(Json::object(params)))
 }
 
 ///|
@@ -616,7 +739,7 @@ pub async fn BidiClient::script_call_function_typed(
     Some(value) => params["this"] = value.to_json()
     None => ()
   }
-  self.send("script.callFunction", params=Some(Json::object(params)))
+  self.dispatch("script", "callFunction", params=Some(Json::object(params)))
 }
 
 ///|
@@ -660,8 +783,9 @@ pub async fn BidiClient::script_add_preload_script(
     Some(value) => params["sandbox"] = Json::string(value)
     None => ()
   }
-  let result = self.send(
-    "script.addPreloadScript",
+  let result = self.dispatch(
+    "script",
+    "addPreloadScript",
     params=Some(Json::object(params)),
   )
   match result {
@@ -683,7 +807,11 @@ pub async fn BidiClient::script_remove_preload_script(
   let params : Map[String, Json] = {}
   params["script"] = Json::string(script_id)
   match
-    self.send("script.removePreloadScript", params=Some(Json::object(params))) {
+    self.dispatch(
+      "script",
+      "removePreloadScript",
+      params=Some(Json::object(params)),
+    ) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -716,7 +844,7 @@ pub async fn BidiClient::script_disown(
   let params : Map[String, Json] = {}
   params["handles"] = Json::array(handle_values)
   params["target"] = Json::object(target)
-  match self.send("script.disown", params=Some(Json::object(params))) {
+  match self.dispatch("script", "disown", params=Some(Json::object(params))) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -735,7 +863,8 @@ pub async fn BidiClient::input_perform_actions(
     Some(ctx) => params["context"] = Json::string(ctx)
     None => ()
   }
-  match self.send("input.performActions", params=Some(Json::object(params))) {
+  match
+    self.dispatch("input", "performActions", params=Some(Json::object(params))) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -769,7 +898,8 @@ pub async fn BidiClient::input_release_actions(
     Some(ctx) => params["context"] = Json::string(ctx)
     None => ()
   }
-  match self.send("input.releaseActions", params=Some(Json::object(params))) {
+  match
+    self.dispatch("input", "releaseActions", params=Some(Json::object(params))) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -795,7 +925,11 @@ pub async fn BidiClient::network_set_cache_behavior(
     None => ()
   }
   match
-    self.send("network.setCacheBehavior", params=Some(Json::object(params))) {
+    self.dispatch(
+      "network",
+      "setCacheBehavior",
+      params=Some(Json::object(params)),
+    ) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -820,7 +954,7 @@ pub async fn BidiClient::network_set_cache_behavior_typed(
 pub async fn BidiClient::network_add_data_collector(
   self : BidiClient,
 ) -> Result[Unit, ClientError] {
-  match self.send("network.addDataCollector") {
+  match self.dispatch("network", "addDataCollector") {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -833,7 +967,11 @@ pub async fn BidiClient::network_add_data_collector_typed(
   collector : NetworkDataCollector,
 ) -> Result[Unit, ClientError] {
   match
-    self.send("network.addDataCollector", params=Some(collector.to_json())) {
+    self.dispatch(
+      "network",
+      "addDataCollector",
+      params=Some(collector.to_json()),
+    ) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
@@ -886,4 +1024,38 @@ fn BidiClient::dispatch_event(self : BidiClient, evt : BidiEvent) -> Unit {
 ///|
 fn is_valid_navigation_wait(wait : String) -> Bool {
   wait == "none" || wait == "interactive" || wait == "complete"
+}
+
+///|
+fn is_supported_domain_command(domain : String, command : String) -> Bool {
+  match domain {
+    "session" =>
+      command == "status" ||
+      command == "new" ||
+      command == "subscribe" ||
+      command == "unsubscribe" ||
+      command == "end"
+    "browser" =>
+      command == "getUserContexts" ||
+      command == "createUserContext" ||
+      command == "removeUserContext" ||
+      command == "close"
+    "browsingContext" =>
+      command == "create" ||
+      command == "reload" ||
+      command == "close" ||
+      command == "getTree" ||
+      command == "navigate" ||
+      command == "captureScreenshot" ||
+      command == "locateNodes"
+    "script" =>
+      command == "evaluate" ||
+      command == "callFunction" ||
+      command == "addPreloadScript" ||
+      command == "removePreloadScript" ||
+      command == "disown"
+    "input" => command == "performActions" || command == "releaseActions"
+    "network" => command == "setCacheBehavior" || command == "addDataCollector"
+    _ => false
+  }
 }

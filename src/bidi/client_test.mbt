@@ -48,6 +48,19 @@ fn test_get_int_field(json : Json, key : String) -> Int? {
 }
 
 ///|
+fn test_get_bool_field(json : Json, key : String) -> Bool? {
+  match json {
+    Object(map) =>
+      match map.get(key) {
+        Some(True) => Some(true)
+        Some(False) => Some(false)
+        _ => None
+      }
+    _ => None
+  }
+}
+
+///|
 fn test_get_object_field(json : Json, key : String) -> Json? {
   match json {
     Object(map) =>
@@ -315,6 +328,78 @@ async test "log.entryAdded hook supports level filter" {
     captured.val = captured.val + 1
   })
   client.on_log_entry_added(level="info", fn(_evt : BidiEvent) {
+    captured.val = captured.val + 1
+  })
+  let _ = client.send("session.status")
+  inspect(captured.val, content="1")
+}
+
+///|
+async test "central dispatch sends session.status" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = {
+    val: [
+      "{\"id\":1,\"type\":\"success\",\"result\":{\"ready\":true,\"message\":\"ok\"}}",
+    ],
+  }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let result = client.dispatch("session", "status")
+  match result {
+    Ok(json) => {
+      inspect(test_get_bool_field(json, "ready"), content="Some(true)")
+      inspect(test_get_string_field(json, "message"), content="Some(\"ok\")")
+      inspect(
+        test_get_int_field(
+          @json.parse(sent.val[0]) catch {
+            _ => Json::null()
+          },
+          "id",
+        ),
+        content="Some(1)",
+      )
+      inspect(
+        test_get_string_field(
+          @json.parse(sent.val[0]) catch {
+            _ => Json::null()
+          },
+          "method",
+        ),
+        content="Some(\"session.status\")",
+      )
+    }
+    Err(_) => assert_true(false)
+  }
+}
+
+///|
+async test "central dispatch rejects unsupported domain command" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = { val: [] }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let result = client.dispatch("session", "unknown")
+  match result {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(message, "Unsupported command for session: unknown")
+    _ => assert_true(false)
+  }
+  inspect(sent.val.length(), content="0")
+}
+
+///|
+async test "browsingContext domain hook receives browsingContext event only" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = {
+    val: [
+      "{\"type\":\"event\",\"method\":\"browsingContext.load\",\"params\":{}}", "{\"type\":\"event\",\"method\":\"network.responseCompleted\",\"params\":{}}",
+      "{\"id\":1,\"type\":\"success\",\"result\":{}}",
+    ],
+  }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0 }
+  client.on_browsing_context_event(fn(_evt : BidiEvent) {
     captured.val = captured.val + 1
   })
   let _ = client.send("session.status")

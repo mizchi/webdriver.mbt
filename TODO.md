@@ -4,7 +4,7 @@ Scope: protocol parsing + spec behavior, independent of any browser backend.
 
 ## Protocol core
 - [x] Define BiDi request/response/event types and JSON codec.
-- [ ] Central dispatch for `session`, `browser`, `browsingContext`, `script`, `input`, `network`, `log`.
+- [x] Central dispatch for `session`, `browser`, `browsingContext`, `script`, `input`, `network`, `log`.
 - [ ] Validate params strictly and return spec error codes/messages.
 - [ ] Event subscription system (global + per-context) and ordering guarantees.
 
