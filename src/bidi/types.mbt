@@ -52,6 +52,7 @@ pub enum TransportError {
 pub enum ClientError {
   Transport(TransportError)
   ParseError(message~ : String)
+  InvalidArgument(message~ : String)
   ResponseError(error~ : BidiError)
 } derive(Show)
 

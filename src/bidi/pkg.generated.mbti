@@ -50,9 +50,10 @@ pub async fn BidiClient::browser_close(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::browser_create_user_context(Self) -> Result[String, ClientError]
 pub async fn BidiClient::browser_get_user_contexts(Self) -> Result[Array[String], ClientError]
 pub async fn BidiClient::browser_remove_user_context(Self, String) -> Result[Unit, ClientError]
+pub async fn BidiClient::browsing_context_capture_screenshot(Self, String, origin? : String, format? : String, quality? : Int, clip? : Json) -> Result[String, ClientError]
 pub async fn BidiClient::browsing_context_close(Self, String) -> Result[Unit, ClientError]
 pub async fn BidiClient::browsing_context_create(Self, String, user_context? : String) -> Result[String, ClientError]
-pub async fn BidiClient::browsing_context_get_tree(Self) -> Result[Json, ClientError]
+pub async fn BidiClient::browsing_context_get_tree(Self, root? : String, max_depth? : Int) -> Result[Json, ClientError]
 pub async fn BidiClient::browsing_context_locate_nodes(Self, String, Json, max_node_count? : Int, serialization_options? : SerializationOptions) -> Result[Json, ClientError]
 pub async fn BidiClient::browsing_context_locate_nodes_typed(Self, String, Locator, max_node_count? : Int, serialization_options? : SerializationOptions) -> Result[Json, ClientError]
 pub async fn BidiClient::browsing_context_navigate(Self, String, String, wait? : String) -> Result[NavigationResult, ClientError]
@@ -68,9 +69,15 @@ pub async fn BidiClient::network_set_cache_behavior(Self, String, contexts? : Ar
 pub async fn BidiClient::network_set_cache_behavior_typed(Self, CacheBehavior, contexts? : Array[String]) -> Result[Unit, ClientError]
 pub fn BidiClient::new(Transport) -> Self
 pub fn BidiClient::on_event(Self, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_event_method(Self, String, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_log_entry_added(Self, level? : String, (BidiEvent) -> Unit) -> Unit
+pub fn BidiClient::on_network_event(Self, (BidiEvent) -> Unit) -> Unit
+pub async fn BidiClient::script_add_preload_script(Self, String, arguments? : Array[RemoteValue], contexts? : Array[String], user_contexts? : Array[String], sandbox? : String) -> Result[String, ClientError]
 pub async fn BidiClient::script_call_function(Self, String, String, arguments? : Array[Json], await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool, this_value? : Json) -> Result[Json, ClientError]
 pub async fn BidiClient::script_call_function_typed(Self, String, String, arguments? : Array[RemoteValue], await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool, this_value? : RemoteValue) -> Result[Json, ClientError]
+pub async fn BidiClient::script_disown(Self, Array[String], context_id? : String, sandbox? : String) -> Result[Unit, ClientError]
 pub async fn BidiClient::script_evaluate(Self, String, String, await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool) -> Result[Json, ClientError]
+pub async fn BidiClient::script_remove_preload_script(Self, String) -> Result[Unit, ClientError]
 pub async fn BidiClient::send(Self, String, params? : Json?) -> Result[Json, ClientError]
 pub async fn BidiClient::session_end(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::session_new(Self, capabilities? : Json?) -> Result[SessionInfo, ClientError]
@@ -124,6 +131,7 @@ pub impl Show for CacheBehavior
 pub enum ClientError {
   Transport(TransportError)
   ParseError(message~ : String)
+  InvalidArgument(message~ : String)
   ResponseError(error~ : BidiError)
 }
 pub impl Show for ClientError

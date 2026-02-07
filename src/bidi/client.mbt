@@ -27,6 +27,55 @@ pub fn BidiClient::on_event(
 }
 
 ///|
+/// Register handler for a specific event method
+pub fn BidiClient::on_event_method(
+  self : BidiClient,
+  event_method : String,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method == event_method {
+      handler(evt)
+    }
+  })
+}
+
+///|
+/// Register handler for network.* events
+pub fn BidiClient::on_network_event(
+  self : BidiClient,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method.has_prefix("network.") {
+      handler(evt)
+    }
+  })
+}
+
+///|
+/// Register handler for log.entryAdded (optional level filter)
+pub fn BidiClient::on_log_entry_added(
+  self : BidiClient,
+  level? : String,
+  handler : (BidiEvent) -> Unit,
+) -> Unit {
+  self.on_event(fn(evt : BidiEvent) {
+    if evt.event_method != "log.entryAdded" {
+      return ()
+    }
+    match level {
+      Some(expected) =>
+        match get_string_field(evt.params, "level") {
+          Some(actual) => if actual == expected { handler(evt) }
+          None => ()
+        }
+      None => handler(evt)
+    }
+  })
+}
+
+///|
 /// Connect transport
 pub async fn BidiClient::connect(
   self : BidiClient,
@@ -305,8 +354,33 @@ pub async fn BidiClient::browsing_context_close(
 /// browsingContext.getTree
 pub async fn BidiClient::browsing_context_get_tree(
   self : BidiClient,
+  root? : String,
+  max_depth? : Int,
 ) -> Result[Json, ClientError] {
-  self.send("browsingContext.getTree")
+  let params : Map[String, Json] = {}
+  let mut has_params = false
+  match root {
+    Some(value) => {
+      params["root"] = Json::string(value)
+      has_params = true
+    }
+    None => ()
+  }
+  match max_depth {
+    Some(depth) =>
+      if depth < 0 {
+        return Err(InvalidArgument(message="max_depth must be non-negative"))
+      } else {
+        params["maxDepth"] = Json::number(depth.to_double())
+        has_params = true
+      }
+    None => ()
+  }
+  if has_params {
+    self.send("browsingContext.getTree", params=Some(Json::object(params)))
+  } else {
+    self.send("browsingContext.getTree")
+  }
 }
 
 ///|
@@ -317,6 +391,9 @@ pub async fn BidiClient::browsing_context_navigate(
   url : String,
   wait? : String = "complete",
 ) -> Result[NavigationResult, ClientError] {
+  if not(is_valid_navigation_wait(wait)) {
+    return Err(InvalidArgument(message="Invalid wait value: " + wait))
+  }
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
   params["url"] = Json::string(url)
@@ -334,6 +411,53 @@ pub async fn BidiClient::browsing_context_navigate(
         _ => Err(ParseError(message="Missing navigation/url field"))
       }
     }
+    Err(e) => Err(e)
+  }
+}
+
+///|
+/// browsingContext.captureScreenshot
+pub async fn BidiClient::browsing_context_capture_screenshot(
+  self : BidiClient,
+  context_id : String,
+  origin? : String,
+  format? : String,
+  quality? : Int,
+  clip? : Json,
+) -> Result[String, ClientError] {
+  let params : Map[String, Json] = {}
+  params["context"] = Json::string(context_id)
+  match origin {
+    Some(value) => params["origin"] = Json::string(value)
+    None => ()
+  }
+  match format {
+    Some(value) => params["format"] = Json::string(value)
+    None => ()
+  }
+  match quality {
+    Some(value) =>
+      if value < 0 || value > 100 {
+        return Err(InvalidArgument(message="quality must be between 0 and 100"))
+      } else {
+        params["quality"] = Json::number(value.to_double())
+      }
+    None => ()
+  }
+  match clip {
+    Some(value) => params["clip"] = value
+    None => ()
+  }
+  let result = self.send(
+    "browsingContext.captureScreenshot",
+    params=Some(Json::object(params)),
+  )
+  match result {
+    Ok(json) =>
+      match get_string_field(json, "data") {
+        Some(data) => Ok(data)
+        None => Err(ParseError(message="Missing data field"))
+      }
     Err(e) => Err(e)
   }
 }
@@ -496,6 +620,109 @@ pub async fn BidiClient::script_call_function_typed(
 }
 
 ///|
+/// script.addPreloadScript
+pub async fn BidiClient::script_add_preload_script(
+  self : BidiClient,
+  function_declaration : String,
+  arguments? : Array[RemoteValue] = [],
+  contexts? : Array[String],
+  user_contexts? : Array[String],
+  sandbox? : String,
+) -> Result[String, ClientError] {
+  let args_json : Array[Json] = []
+  for arg in arguments {
+    args_json.push(arg.to_json())
+  }
+  let params : Map[String, Json] = {}
+  params["functionDeclaration"] = Json::string(function_declaration)
+  params["arguments"] = Json::array(args_json)
+  match contexts {
+    Some(values) => {
+      let items : Array[Json] = []
+      for value in values {
+        items.push(Json::string(value))
+      }
+      params["contexts"] = Json::array(items)
+    }
+    None => ()
+  }
+  match user_contexts {
+    Some(values) => {
+      let items : Array[Json] = []
+      for value in values {
+        items.push(Json::string(value))
+      }
+      params["userContexts"] = Json::array(items)
+    }
+    None => ()
+  }
+  match sandbox {
+    Some(value) => params["sandbox"] = Json::string(value)
+    None => ()
+  }
+  let result = self.send(
+    "script.addPreloadScript",
+    params=Some(Json::object(params)),
+  )
+  match result {
+    Ok(json) =>
+      match get_string_field(json, "script") {
+        Some(script_id) => Ok(script_id)
+        None => Err(ParseError(message="Missing script field"))
+      }
+    Err(e) => Err(e)
+  }
+}
+
+///|
+/// script.removePreloadScript
+pub async fn BidiClient::script_remove_preload_script(
+  self : BidiClient,
+  script_id : String,
+) -> Result[Unit, ClientError] {
+  let params : Map[String, Json] = {}
+  params["script"] = Json::string(script_id)
+  match
+    self.send("script.removePreloadScript", params=Some(Json::object(params))) {
+    Ok(_) => Ok(())
+    Err(e) => Err(e)
+  }
+}
+
+///|
+/// script.disown
+pub async fn BidiClient::script_disown(
+  self : BidiClient,
+  handles : Array[String],
+  context_id? : String,
+  sandbox? : String,
+) -> Result[Unit, ClientError] {
+  if handles.length() == 0 {
+    return Err(InvalidArgument(message="handles must not be empty"))
+  }
+  let target : Map[String, Json] = {}
+  match context_id {
+    Some(value) => target["context"] = Json::string(value)
+    None => return Err(InvalidArgument(message="context_id is required"))
+  }
+  match sandbox {
+    Some(value) => target["sandbox"] = Json::string(value)
+    None => ()
+  }
+  let handle_values : Array[Json] = []
+  for handle in handles {
+    handle_values.push(Json::string(handle))
+  }
+  let params : Map[String, Json] = {}
+  params["handles"] = Json::array(handle_values)
+  params["target"] = Json::object(target)
+  match self.send("script.disown", params=Some(Json::object(params))) {
+    Ok(_) => Ok(())
+    Err(e) => Err(e)
+  }
+}
+
+///|
 /// input.performActions
 pub async fn BidiClient::input_perform_actions(
   self : BidiClient,
@@ -654,4 +881,9 @@ fn BidiClient::dispatch_event(self : BidiClient, evt : BidiEvent) -> Unit {
   for handler in self.event_handlers {
     handler(evt)
   }
+}
+
+///|
+fn is_valid_navigation_wait(wait : String) -> Bool {
+  wait == "none" || wait == "interactive" || wait == "complete"
 }

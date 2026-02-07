@@ -249,3 +249,161 @@ async test "network.addDataCollector typed builds params" {
   let contexts = get_array_field(params, "contexts").unwrap()
   assert_eq(contexts.length(), 1)
 }
+
+///|
+async test "browsingContext.getTree supports root/maxDepth options" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([
+    "{\"id\":1,\"type\":\"success\",\"result\":{\"contexts\":[]}}",
+  ])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.browsing_context_get_tree(root="ctx-root", max_depth=2)
+  match result {
+    Ok(_) => ()
+    Err(_) => assert_true(false)
+  }
+  let sent_json = @json.parse(sent.val[0]) catch {
+    _ => return assert_true(false)
+  }
+  assert_eq(
+    get_string_field(sent_json, "method"),
+    Some("browsingContext.getTree"),
+  )
+  let params = get_object_field(sent_json, "params").unwrap()
+  assert_eq(get_string_field(params, "root"), Some("ctx-root"))
+  assert_eq(get_number_field(params, "maxDepth"), Some(2.0))
+}
+
+///|
+async test "browsingContext.navigate validates wait value" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.browsing_context_navigate(
+    "ctx-1",
+    "https://example.com",
+    wait="not-valid",
+  )
+  match result {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(message, "Invalid wait value: not-valid")
+    _ => assert_true(false)
+  }
+  assert_eq(sent.val.length(), 0)
+}
+
+///|
+async test "browsingContext.captureScreenshot builds params and parses data" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([
+    "{\"id\":1,\"type\":\"success\",\"result\":{\"data\":\"abcd\"}}",
+  ])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.browsing_context_capture_screenshot(
+    "ctx-1",
+    format="image/jpeg",
+    quality=80,
+  )
+  match result {
+    Ok(data) => assert_eq(data, "abcd")
+    Err(_) => assert_true(false)
+  }
+  let sent_json = @json.parse(sent.val[0]) catch {
+    _ => return assert_true(false)
+  }
+  assert_eq(
+    get_string_field(sent_json, "method"),
+    Some("browsingContext.captureScreenshot"),
+  )
+  let params = get_object_field(sent_json, "params").unwrap()
+  assert_eq(get_string_field(params, "context"), Some("ctx-1"))
+  assert_eq(get_string_field(params, "format"), Some("image/jpeg"))
+  assert_eq(get_number_field(params, "quality"), Some(80.0))
+}
+
+///|
+async test "script.addPreloadScript builds params and parses script id" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([
+    "{\"id\":1,\"type\":\"success\",\"result\":{\"script\":\"script-1\"}}",
+  ])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.script_add_preload_script(
+    "(() => 1)",
+    arguments=[RemoteValue::number(1.0)],
+    contexts=["ctx-1"],
+    user_contexts=["default"],
+    sandbox="main",
+  )
+  match result {
+    Ok(script_id) => assert_eq(script_id, "script-1")
+    Err(_) => assert_true(false)
+  }
+  let sent_json = @json.parse(sent.val[0]) catch {
+    _ => return assert_true(false)
+  }
+  assert_eq(
+    get_string_field(sent_json, "method"),
+    Some("script.addPreloadScript"),
+  )
+  let params = get_object_field(sent_json, "params").unwrap()
+  assert_eq(get_string_field(params, "functionDeclaration"), Some("(() => 1)"))
+  assert_eq(get_string_field(params, "sandbox"), Some("main"))
+  let contexts = get_array_field(params, "contexts").unwrap()
+  assert_eq(contexts.length(), 1)
+  let user_contexts = get_array_field(params, "userContexts").unwrap()
+  assert_eq(user_contexts.length(), 1)
+  let arguments = get_array_field(params, "arguments").unwrap()
+  assert_eq(arguments.length(), 1)
+}
+
+///|
+async test "script.removePreloadScript builds params" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([
+    "{\"id\":1,\"type\":\"success\",\"result\":{}}",
+  ])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.script_remove_preload_script("script-1")
+  match result {
+    Ok(_) => ()
+    Err(_) => assert_true(false)
+  }
+  let sent_json = @json.parse(sent.val[0]) catch {
+    _ => return assert_true(false)
+  }
+  assert_eq(
+    get_string_field(sent_json, "method"),
+    Some("script.removePreloadScript"),
+  )
+  let params = get_object_field(sent_json, "params").unwrap()
+  assert_eq(get_string_field(params, "script"), Some("script-1"))
+}
+
+///|
+async test "script.disown builds params" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([
+    "{\"id\":1,\"type\":\"success\",\"result\":{}}",
+  ])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.script_disown(
+    ["h-1", "h-2"],
+    context_id="ctx-1",
+    sandbox="main",
+  )
+  match result {
+    Ok(_) => ()
+    Err(_) => assert_true(false)
+  }
+  let sent_json = @json.parse(sent.val[0]) catch {
+    _ => return assert_true(false)
+  }
+  assert_eq(get_string_field(sent_json, "method"), Some("script.disown"))
+  let params = get_object_field(sent_json, "params").unwrap()
+  let handles = get_array_field(params, "handles").unwrap()
+  assert_eq(handles.length(), 2)
+  let target = get_object_field(params, "target").unwrap()
+  assert_eq(get_string_field(target, "context"), Some("ctx-1"))
+  assert_eq(get_string_field(target, "sandbox"), Some("main"))
+}

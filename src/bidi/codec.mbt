@@ -35,7 +35,12 @@ pub fn parse_incoming(json_str : String) -> Result[BidiIncoming, String] {
 /// Parse response from JSON object map
 fn parse_response(map : Map[String, Json]) -> Result[BidiIncoming, String] {
   let id = match map.get("id") {
-    Some(Number(n, ..)) => n.to_int()
+    Some(Number(n, ..)) =>
+      if n.trunc() == n {
+        n.to_int()
+      } else {
+        return Err("Invalid id field")
+      }
     _ => return Err("Missing id field")
   }
   let is_error = match map.get("type") {
@@ -45,11 +50,11 @@ fn parse_response(map : Map[String, Json]) -> Result[BidiIncoming, String] {
   if is_error {
     let error = match map.get("error") {
       Some(String(s)) => s
-      _ => ""
+      _ => return Err("Missing error field")
     }
     let message = match map.get("message") {
       Some(String(s)) => s
-      _ => ""
+      _ => return Err("Missing message field")
     }
     let stacktrace = match map.get("stacktrace") {
       Some(String(s)) => s
@@ -58,8 +63,11 @@ fn parse_response(map : Map[String, Json]) -> Result[BidiIncoming, String] {
     let err : BidiError = { error, message, stacktrace }
     Ok(BidiIncoming::Response({ id, result: None, error: Some(err) }))
   } else {
-    let result = map.get("result")
-    Ok(BidiIncoming::Response({ id, result, error: None }))
+    let result = match map.get("result") {
+      Some(value) => value
+      None => return Err("Missing result field")
+    }
+    Ok(BidiIncoming::Response({ id, result: Some(result), error: None }))
   }
 }
 
@@ -71,7 +79,8 @@ fn parse_event(map : Map[String, Json]) -> Result[BidiIncoming, String] {
     _ => return Err("Missing method field")
   }
   let params = match map.get("params") {
-    Some(p) => p
+    Some(Object(obj)) => Json::object(obj)
+    Some(_) => return Err("Invalid params field")
     None => Json::object({})
   }
   Ok(BidiIncoming::Event({ event_method: method_name, params }))

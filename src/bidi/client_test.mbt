@@ -279,3 +279,44 @@ async test "network.setCacheBehavior builds params" {
   }
   inspect(contexts.length(), content="2")
 }
+
+///|
+async test "network event hook filters by method prefix" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = {
+    val: [
+      "{\"type\":\"event\",\"method\":\"network.responseCompleted\",\"params\":{}}",
+      "{\"id\":1,\"type\":\"success\",\"result\":{}}",
+    ],
+  }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let captured : Ref[String?] = { val: None }
+  client.on_network_event(fn(evt : BidiEvent) {
+    captured.val = Some(evt.event_method)
+  })
+  let _ = client.send("session.status")
+  inspect(captured.val, content="Some(\"network.responseCompleted\")")
+}
+
+///|
+async test "log.entryAdded hook supports level filter" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = {
+    val: [
+      "{\"type\":\"event\",\"method\":\"log.entryAdded\",\"params\":{\"level\":\"info\"}}",
+      "{\"id\":1,\"type\":\"success\",\"result\":{}}",
+    ],
+  }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0 }
+  client.on_log_entry_added(level="error", fn(_evt : BidiEvent) {
+    captured.val = captured.val + 1
+  })
+  client.on_log_entry_added(level="info", fn(_evt : BidiEvent) {
+    captured.val = captured.val + 1
+  })
+  let _ = client.send("session.status")
+  inspect(captured.val, content="1")
+}
