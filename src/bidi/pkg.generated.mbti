@@ -43,8 +43,11 @@ pub struct BidiClient {
   transport : Transport
   mut next_id : Int
   mut connected : Bool
+  mut has_subscription_filter : Bool
   pending : Map[Int, BidiResponse]
   event_handlers : Array[(BidiEvent) -> Unit]
+  global_subscriptions : Map[String, Bool]
+  context_subscriptions : Map[String, Map[String, Bool]]
 }
 pub async fn BidiClient::browser_close(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::browser_create_user_context(Self) -> Result[String, ClientError]
@@ -56,6 +59,7 @@ pub async fn BidiClient::browsing_context_create(Self, String, user_context? : S
 pub async fn BidiClient::browsing_context_get_tree(Self, root? : String, max_depth? : Int) -> Result[Json, ClientError]
 pub async fn BidiClient::browsing_context_locate_nodes(Self, String, Json, max_node_count? : Int, serialization_options? : SerializationOptions) -> Result[Json, ClientError]
 pub async fn BidiClient::browsing_context_locate_nodes_typed(Self, String, Locator, max_node_count? : Int, serialization_options? : SerializationOptions) -> Result[Json, ClientError]
+pub async fn BidiClient::browsing_context_locate_nodes_typed_refs(Self, String, Locator, max_node_count? : Int, serialization_options? : SerializationOptions) -> Result[Array[NodeReference], ClientError]
 pub async fn BidiClient::browsing_context_navigate(Self, String, String, wait? : String) -> Result[NavigationResult, ClientError]
 pub async fn BidiClient::browsing_context_reload(Self, String) -> Result[Unit, ClientError]
 pub fn BidiClient::close(Self) -> Result[Unit, ClientError]
@@ -89,8 +93,8 @@ pub async fn BidiClient::send(Self, String, params? : Json?) -> Result[Json, Cli
 pub async fn BidiClient::session_end(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::session_new(Self, capabilities? : Json?) -> Result[SessionInfo, ClientError]
 pub async fn BidiClient::session_status(Self) -> Result[SessionStatus, ClientError]
-pub async fn BidiClient::session_subscribe(Self, Array[String]) -> Result[Unit, ClientError]
-pub async fn BidiClient::session_unsubscribe(Self, Array[String]) -> Result[Unit, ClientError]
+pub async fn BidiClient::session_subscribe(Self, Array[String], contexts? : Array[String]) -> Result[Unit, ClientError]
+pub async fn BidiClient::session_unsubscribe(Self, Array[String], contexts? : Array[String]) -> Result[Unit, ClientError]
 
 pub struct BidiError {
   error : String
@@ -230,6 +234,12 @@ pub struct NetworkDataCollector {
 pub fn NetworkDataCollector::new(Array[String], contexts? : Array[String]) -> Self
 pub fn NetworkDataCollector::to_json(Self) -> Json
 pub impl Show for NetworkDataCollector
+
+pub struct NodeReference {
+  handle : String?
+  shared_id : String?
+}
+pub impl Show for NodeReference
 
 pub struct PointerParameters {
   pointer_type : PointerType

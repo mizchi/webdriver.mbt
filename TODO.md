@@ -5,13 +5,13 @@ Scope: protocol parsing + spec behavior, independent of any browser backend.
 ## Protocol core
 - [x] Define BiDi request/response/event types and JSON codec.
 - [x] Central dispatch for `session`, `browser`, `browsingContext`, `script`, `input`, `network`, `log`.
-- [ ] Validate params strictly and return spec error codes/messages.
-- [ ] Event subscription system (global + per-context) and ordering guarantees.
+- [x] Validate params strictly and return spec error codes/messages.
+- [x] Event subscription system (global + per-context) and ordering guarantees.
 
 ## browsingContext
 - [x] `getTree` with `root`/`maxDepth` handling.
 - [x] `create`, `close`, `navigate` with `wait` semantics.
-- [ ] `locateNodes` with selector strategies and return node references (handle/sharedId).
+- [x] `locateNodes` with selector strategies and return node references (handle/sharedId).
 - [x] `captureScreenshot` (delegates to backend).
 
 ## script
@@ -31,4 +31,4 @@ Scope: protocol parsing + spec behavior, independent of any browser backend.
 
 ## Tests
 - [x] Unit tests for codec + validation.
-- [ ] Protocol behavior tests (event ordering, errors, subscriptions).
+- [x] Protocol behavior tests (event ordering, errors, subscriptions).

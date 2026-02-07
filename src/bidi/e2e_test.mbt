@@ -475,6 +475,17 @@ async test "bidi e2e" {
       }
     Err(_) => assert_true(false)
   }
+  let locate_nodes_refs = client.browsing_context_locate_nodes_typed_refs(
+    ctx,
+    Locator::css("body"),
+  )
+  match locate_nodes_refs {
+    Ok(nodes) => {
+      assert_true(nodes.length() >= 1)
+      assert_eq(nodes[0].shared_id, Some("node-0"))
+    }
+    Err(_) => assert_true(false)
+  }
   let eval_result = client.script_evaluate("document.title", ctx)
   match eval_result {
     Ok(json) =>

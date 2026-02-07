@@ -78,6 +78,13 @@ pub struct NavigationResult {
 } derive(Show)
 
 ///|
+/// browsingContext.locateNodes node reference
+pub struct NodeReference {
+  handle : String?
+  shared_id : String?
+} derive(Show)
+
+///|
 /// Result ownership for script.evaluate / callFunction
 pub enum ResultOwnership {
   NoneOwnership

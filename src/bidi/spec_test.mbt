@@ -286,7 +286,9 @@ async test "browsingContext.navigate validates wait value" {
   )
   match result {
     Err(InvalidArgument(message~)) =>
-      assert_eq(message, "Invalid wait value: not-valid")
+      assert_eq(
+        message, "invalid argument: wait must be one of none|interactive|complete",
+      )
     _ => assert_true(false)
   }
   assert_eq(sent.val.length(), 0)
@@ -406,4 +408,96 @@ async test "script.disown builds params" {
   let target = get_object_field(params, "target").unwrap()
   assert_eq(get_string_field(target, "context"), Some("ctx-1"))
   assert_eq(get_string_field(target, "sandbox"), Some("main"))
+}
+
+///|
+async test "browsingContext.locateNodes typed refs parses handle/sharedId" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([
+    "{\"id\":1,\"type\":\"success\",\"result\":{\"nodes\":[{\"sharedId\":\"node-1\"},{\"handle\":\"h-2\"}]}}",
+  ])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.browsing_context_locate_nodes_typed_refs(
+    "ctx-1",
+    Locator::css("body"),
+  )
+  match result {
+    Ok(nodes) => {
+      assert_eq(nodes.length(), 2)
+      assert_eq(nodes[0].shared_id, Some("node-1"))
+      assert_eq(nodes[0].handle, None)
+      assert_eq(nodes[1].handle, Some("h-2"))
+      assert_eq(nodes[1].shared_id, None)
+    }
+    Err(_) => assert_true(false)
+  }
+}
+
+///|
+async test "browsingContext.locateNodes validates params strictly" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let empty_context = client.browsing_context_locate_nodes(
+    "",
+    Json::object({ "type": Json::string("css"), "value": Json::string("body") }),
+  )
+  match empty_context {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(message, "invalid argument: context must not be empty")
+    _ => assert_true(false)
+  }
+  let missing_value = client.browsing_context_locate_nodes(
+    "ctx-1",
+    Json::object({ "type": Json::string("css") }),
+  )
+  match missing_value {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(
+        message, "invalid argument: locator.value must be a non-empty string for css locator",
+      )
+    _ => assert_true(false)
+  }
+  let invalid_count = client.browsing_context_locate_nodes(
+    "ctx-1",
+    Json::object({ "type": Json::string("css"), "value": Json::string("body") }),
+    max_node_count=0,
+  )
+  match invalid_count {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(
+        message, "invalid argument: maxNodeCount must be greater than 0",
+      )
+    _ => assert_true(false)
+  }
+}
+
+///|
+async test "network.setCacheBehavior validates params strictly" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.network_set_cache_behavior("invalid")
+  match result {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(
+        message, "invalid argument: cacheBehavior must be one of default|bypass",
+      )
+    _ => assert_true(false)
+  }
+  assert_eq(sent.val.length(), 0)
+}
+
+///|
+async test "session.new validates capabilities object" {
+  let sent : Ref[Array[String]] = Ref::new([])
+  let recv_queue : Ref[Array[String]] = Ref::new([])
+  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let result = client.session_new(capabilities=Some(Json::string("bad")))
+  match result {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(message, "invalid argument: capabilities must be a JSON object")
+    _ => assert_true(false)
+  }
+  assert_eq(sent.val.length(), 0)
 }

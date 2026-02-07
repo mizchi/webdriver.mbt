@@ -7,14 +7,26 @@ pub struct BidiClient {
   transport : Transport
   mut next_id : Int
   mut connected : Bool
+  mut has_subscription_filter : Bool
   pending : Map[Int, BidiResponse]
   event_handlers : Array[(BidiEvent) -> Unit]
+  global_subscriptions : Map[String, Bool]
+  context_subscriptions : Map[String, Map[String, Bool]]
 }
 
 ///|
 /// Create a new client
 pub fn BidiClient::new(transport : Transport) -> BidiClient {
-  { transport, next_id: 1, connected: false, pending: {}, event_handlers: [] }
+  {
+    transport,
+    next_id: 1,
+    connected: false,
+    has_subscription_filter: false,
+    pending: {},
+    event_handlers: [],
+    global_subscriptions: {},
+    context_subscriptions: {},
+  }
 }
 
 ///|
@@ -222,11 +234,7 @@ pub async fn BidiClient::dispatch(
   params? : Json? = None,
 ) -> Result[Json, ClientError] {
   if not(is_supported_domain_command(domain, command)) {
-    return Err(
-      InvalidArgument(
-        message="Unsupported command for " + domain + ": " + command,
-      ),
-    )
+    return Err(unknown_command_error(domain, command))
   }
   self.send(domain + "." + command, params~)
 }
@@ -256,6 +264,17 @@ pub async fn BidiClient::session_new(
   self : BidiClient,
   capabilities? : Json? = None,
 ) -> Result[SessionInfo, ClientError] {
+  match capabilities {
+    Some(caps) =>
+      match caps {
+        Object(_) => ()
+        _ =>
+          return Err(
+            invalid_argument_error("capabilities must be a JSON object"),
+          )
+      }
+    None => ()
+  }
   let result = match capabilities {
     Some(caps) => {
       let params : Map[String, Json] = {}
@@ -282,16 +301,34 @@ pub async fn BidiClient::session_new(
 pub async fn BidiClient::session_subscribe(
   self : BidiClient,
   events : Array[String],
+  contexts? : Array[String],
 ) -> Result[Unit, ClientError] {
+  match validate_subscription_request(events, contexts) {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let json_events : Array[Json] = []
   for e in events {
     json_events.push(Json::string(e))
   }
   let params : Map[String, Json] = {}
   params["events"] = Json::array(json_events)
+  match contexts {
+    Some(context_ids) => {
+      let json_contexts : Array[Json] = []
+      for context_id in context_ids {
+        json_contexts.push(Json::string(context_id))
+      }
+      params["contexts"] = Json::array(json_contexts)
+    }
+    None => ()
+  }
   match
     self.dispatch("session", "subscribe", params=Some(Json::object(params))) {
-    Ok(_) => Ok(())
+    Ok(_) => {
+      self.apply_subscribe(events, contexts)
+      Ok(())
+    }
     Err(e) => Err(e)
   }
 }
@@ -301,16 +338,34 @@ pub async fn BidiClient::session_subscribe(
 pub async fn BidiClient::session_unsubscribe(
   self : BidiClient,
   events : Array[String],
+  contexts? : Array[String],
 ) -> Result[Unit, ClientError] {
+  match validate_subscription_request(events, contexts) {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let json_events : Array[Json] = []
   for e in events {
     json_events.push(Json::string(e))
   }
   let params : Map[String, Json] = {}
   params["events"] = Json::array(json_events)
+  match contexts {
+    Some(context_ids) => {
+      let json_contexts : Array[Json] = []
+      for context_id in context_ids {
+        json_contexts.push(Json::string(context_id))
+      }
+      params["contexts"] = Json::array(json_contexts)
+    }
+    None => ()
+  }
   match
     self.dispatch("session", "unsubscribe", params=Some(Json::object(params))) {
-    Ok(_) => Ok(())
+    Ok(_) => {
+      self.apply_unsubscribe(events, contexts)
+      Ok(())
+    }
     Err(e) => Err(e)
   }
 }
@@ -373,6 +428,10 @@ pub async fn BidiClient::browser_remove_user_context(
   self : BidiClient,
   user_context : String,
 ) -> Result[Unit, ClientError] {
+  match validate_non_empty_string(user_context, "userContext") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["userContext"] = Json::string(user_context)
   match
@@ -404,6 +463,17 @@ pub async fn BidiClient::browsing_context_create(
   context_type : String,
   user_context? : String,
 ) -> Result[String, ClientError] {
+  if context_type != "tab" && context_type != "window" {
+    return Err(invalid_argument_error("type must be one of tab|window"))
+  }
+  match user_context {
+    Some(value) =>
+      match validate_non_empty_string(value, "userContext") {
+        Ok(_) => ()
+        Err(e) => return Err(e)
+      }
+    None => ()
+  }
   let params : Map[String, Json] = {}
   params["type"] = Json::string(context_type)
   match user_context {
@@ -431,6 +501,10 @@ pub async fn BidiClient::browsing_context_reload(
   self : BidiClient,
   context_id : String,
 ) -> Result[Unit, ClientError] {
+  match validate_non_empty_string(context_id, "context") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
   match
@@ -450,6 +524,10 @@ pub async fn BidiClient::browsing_context_close(
   self : BidiClient,
   context_id : String,
 ) -> Result[Unit, ClientError] {
+  match validate_non_empty_string(context_id, "context") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
   match
@@ -469,16 +547,19 @@ pub async fn BidiClient::browsing_context_get_tree(
   let params : Map[String, Json] = {}
   let mut has_params = false
   match root {
-    Some(value) => {
-      params["root"] = Json::string(value)
-      has_params = true
-    }
+    Some(value) =>
+      if value.is_empty() {
+        return Err(invalid_argument_error("root must not be empty"))
+      } else {
+        params["root"] = Json::string(value)
+        has_params = true
+      }
     None => ()
   }
   match max_depth {
     Some(depth) =>
       if depth < 0 {
-        return Err(InvalidArgument(message="max_depth must be non-negative"))
+        return Err(invalid_argument_error("maxDepth must be non-negative"))
       } else {
         params["maxDepth"] = Json::number(depth.to_double())
         has_params = true
@@ -504,8 +585,18 @@ pub async fn BidiClient::browsing_context_navigate(
   url : String,
   wait? : String = "complete",
 ) -> Result[NavigationResult, ClientError] {
+  match validate_non_empty_string(context_id, "context") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
+  match validate_non_empty_string(url, "url") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   if not(is_valid_navigation_wait(wait)) {
-    return Err(InvalidArgument(message="Invalid wait value: " + wait))
+    return Err(
+      invalid_argument_error("wait must be one of none|interactive|complete"),
+    )
   }
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
@@ -539,20 +630,40 @@ pub async fn BidiClient::browsing_context_capture_screenshot(
   quality? : Int,
   clip? : Json,
 ) -> Result[String, ClientError] {
+  match validate_non_empty_string(context_id, "context") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
   match origin {
-    Some(value) => params["origin"] = Json::string(value)
+    Some(value) =>
+      if value != "viewport" && value != "document" {
+        return Err(
+          invalid_argument_error("origin must be one of viewport|document"),
+        )
+      } else {
+        params["origin"] = Json::string(value)
+      }
     None => ()
   }
   match format {
-    Some(value) => params["format"] = Json::string(value)
+    Some(value) =>
+      if not(is_supported_screenshot_format(value)) {
+        return Err(
+          invalid_argument_error(
+            "format must be one of image/png|image/jpeg|png|jpeg",
+          ),
+        )
+      } else {
+        params["format"] = Json::string(value)
+      }
     None => ()
   }
   match quality {
     Some(value) =>
       if value < 0 || value > 100 {
-        return Err(InvalidArgument(message="quality must be between 0 and 100"))
+        return Err(invalid_argument_error("quality must be between 0 and 100"))
       } else {
         params["quality"] = Json::number(value.to_double())
       }
@@ -586,21 +697,8 @@ pub async fn BidiClient::browsing_context_locate_nodes(
   max_node_count? : Int,
   serialization_options? : SerializationOptions,
 ) -> Result[Json, ClientError] {
-  let params : Map[String, Json] = {}
-  params["context"] = Json::string(context_id)
-  params["locator"] = locator
-  match max_node_count {
-    Some(count) => params["maxNodeCount"] = Json::number(count.to_double())
-    None => ()
-  }
-  match serialization_options {
-    Some(opts) => params["serializationOptions"] = opts.to_json()
-    None => ()
-  }
-  self.dispatch(
-    "browsingContext",
-    "locateNodes",
-    params=Some(Json::object(params)),
+  self.locate_nodes_impl(
+    context_id, locator, max_node_count, serialization_options,
   )
 }
 
@@ -613,15 +711,71 @@ pub async fn BidiClient::browsing_context_locate_nodes_typed(
   max_node_count? : Int,
   serialization_options? : SerializationOptions,
 ) -> Result[Json, ClientError] {
+  self.locate_nodes_impl(
+    context_id,
+    locator.to_json(),
+    max_node_count,
+    serialization_options,
+  )
+}
+
+///|
+/// browsingContext.locateNodes (typed refs)
+pub async fn BidiClient::browsing_context_locate_nodes_typed_refs(
+  self : BidiClient,
+  context_id : String,
+  locator : Locator,
+  max_node_count? : Int,
+  serialization_options? : SerializationOptions,
+) -> Result[Array[NodeReference], ClientError] {
+  let result = self.locate_nodes_impl(
+    context_id,
+    locator.to_json(),
+    max_node_count,
+    serialization_options,
+  )
+  match result {
+    Ok(json) => parse_node_references(json)
+    Err(e) => Err(e)
+  }
+}
+
+///|
+async fn BidiClient::locate_nodes_impl(
+  self : BidiClient,
+  context_id : String,
+  locator : Json,
+  max_node_count : Int?,
+  serialization_options : SerializationOptions?,
+) -> Result[Json, ClientError] {
+  match validate_non_empty_string(context_id, "context") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
+  match validate_locator(locator) {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
-  params["locator"] = locator.to_json()
+  params["locator"] = locator
   match max_node_count {
-    Some(count) => params["maxNodeCount"] = Json::number(count.to_double())
+    Some(count) =>
+      if count <= 0 {
+        return Err(
+          invalid_argument_error("maxNodeCount must be greater than 0"),
+        )
+      } else {
+        params["maxNodeCount"] = Json::number(count.to_double())
+      }
     None => ()
   }
   match serialization_options {
-    Some(opts) => params["serializationOptions"] = opts.to_json()
+    Some(opts) =>
+      match validate_serialization_options(opts) {
+        Ok(_) => params["serializationOptions"] = opts.to_json()
+        Err(e) => return Err(e)
+      }
     None => ()
   }
   self.dispatch(
@@ -629,6 +783,28 @@ pub async fn BidiClient::browsing_context_locate_nodes_typed(
     "locateNodes",
     params=Some(Json::object(params)),
   )
+}
+
+///|
+fn parse_node_references(
+  result : Json,
+) -> Result[Array[NodeReference], ClientError] {
+  let nodes = match get_array_field(result, "nodes") {
+    Some(values) => values
+    None => return Err(ParseError(message="Missing nodes field"))
+  }
+  let references : Array[NodeReference] = []
+  for node in nodes {
+    let handle = get_string_field(node, "handle")
+    let shared_id = get_string_field(node, "sharedId")
+    if handle == None && shared_id == None {
+      return Err(
+        ParseError(message="Node reference must include handle or sharedId"),
+      )
+    }
+    references.push({ handle, shared_id })
+  }
+  Ok(references)
 }
 
 ///|
@@ -642,6 +818,14 @@ pub async fn BidiClient::script_evaluate(
   serialization_options? : SerializationOptions,
   user_activation? : Bool,
 ) -> Result[Json, ClientError] {
+  match validate_non_empty_string(expression, "expression") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
+  match validate_non_empty_string(context_id, "context") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["expression"] = Json::string(expression)
   params["target"] = Json::object({ "context": Json::string(context_id) })
@@ -652,7 +836,11 @@ pub async fn BidiClient::script_evaluate(
     None => ()
   }
   match serialization_options {
-    Some(opts) => params["serializationOptions"] = opts.to_json()
+    Some(opts) =>
+      match validate_serialization_options(opts) {
+        Ok(_) => params["serializationOptions"] = opts.to_json()
+        Err(e) => return Err(e)
+      }
     None => ()
   }
   match user_activation {
@@ -675,29 +863,10 @@ pub async fn BidiClient::script_call_function(
   user_activation? : Bool,
   this_value? : Json,
 ) -> Result[Json, ClientError] {
-  let params : Map[String, Json] = {}
-  params["functionDeclaration"] = Json::string(function_declaration)
-  params["target"] = Json::object({ "context": Json::string(context_id) })
-  params["arguments"] = Json::array(arguments)
-  params["awaitPromise"] = Json::boolean(await_promise)
-  match result_ownership {
-    Some(ownership) =>
-      params["resultOwnership"] = Json::string(ownership.to_string())
-    None => ()
-  }
-  match serialization_options {
-    Some(opts) => params["serializationOptions"] = opts.to_json()
-    None => ()
-  }
-  match user_activation {
-    Some(active) => params["userActivation"] = Json::boolean(active)
-    None => ()
-  }
-  match this_value {
-    Some(value) => params["this"] = value
-    None => ()
-  }
-  self.dispatch("script", "callFunction", params=Some(Json::object(params)))
+  self.call_function_impl(
+    function_declaration, context_id, arguments, await_promise, result_ownership,
+    serialization_options, user_activation, this_value,
+  )
 }
 
 ///|
@@ -717,10 +886,40 @@ pub async fn BidiClient::script_call_function_typed(
   for arg in arguments {
     args_json.push(arg.to_json())
   }
+  let this_value_json = match this_value {
+    Some(value) => Some(value.to_json())
+    None => None
+  }
+  self.call_function_impl(
+    function_declaration, context_id, args_json, await_promise, result_ownership,
+    serialization_options, user_activation, this_value_json,
+  )
+}
+
+///|
+async fn BidiClient::call_function_impl(
+  self : BidiClient,
+  function_declaration : String,
+  context_id : String,
+  arguments : Array[Json],
+  await_promise : Bool,
+  result_ownership : ResultOwnership?,
+  serialization_options : SerializationOptions?,
+  user_activation : Bool?,
+  this_value : Json?,
+) -> Result[Json, ClientError] {
+  match validate_non_empty_string(function_declaration, "functionDeclaration") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
+  match validate_non_empty_string(context_id, "context") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["functionDeclaration"] = Json::string(function_declaration)
   params["target"] = Json::object({ "context": Json::string(context_id) })
-  params["arguments"] = Json::array(args_json)
+  params["arguments"] = Json::array(arguments)
   params["awaitPromise"] = Json::boolean(await_promise)
   match result_ownership {
     Some(ownership) =>
@@ -728,7 +927,11 @@ pub async fn BidiClient::script_call_function_typed(
     None => ()
   }
   match serialization_options {
-    Some(opts) => params["serializationOptions"] = opts.to_json()
+    Some(opts) =>
+      match validate_serialization_options(opts) {
+        Ok(_) => params["serializationOptions"] = opts.to_json()
+        Err(e) => return Err(e)
+      }
     None => ()
   }
   match user_activation {
@@ -736,7 +939,7 @@ pub async fn BidiClient::script_call_function_typed(
     None => ()
   }
   match this_value {
-    Some(value) => params["this"] = value.to_json()
+    Some(value) => params["this"] = value
     None => ()
   }
   self.dispatch("script", "callFunction", params=Some(Json::object(params)))
@@ -752,6 +955,10 @@ pub async fn BidiClient::script_add_preload_script(
   user_contexts? : Array[String],
   sandbox? : String,
 ) -> Result[String, ClientError] {
+  match validate_non_empty_string(function_declaration, "functionDeclaration") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let args_json : Array[Json] = []
   for arg in arguments {
     args_json.push(arg.to_json())
@@ -761,6 +968,10 @@ pub async fn BidiClient::script_add_preload_script(
   params["arguments"] = Json::array(args_json)
   match contexts {
     Some(values) => {
+      match validate_context_ids(values, "contexts") {
+        Ok(_) => ()
+        Err(e) => return Err(e)
+      }
       let items : Array[Json] = []
       for value in values {
         items.push(Json::string(value))
@@ -771,6 +982,10 @@ pub async fn BidiClient::script_add_preload_script(
   }
   match user_contexts {
     Some(values) => {
+      match validate_context_ids(values, "userContexts") {
+        Ok(_) => ()
+        Err(e) => return Err(e)
+      }
       let items : Array[Json] = []
       for value in values {
         items.push(Json::string(value))
@@ -780,7 +995,12 @@ pub async fn BidiClient::script_add_preload_script(
     None => ()
   }
   match sandbox {
-    Some(value) => params["sandbox"] = Json::string(value)
+    Some(value) =>
+      if value.is_empty() {
+        return Err(invalid_argument_error("sandbox must not be empty"))
+      } else {
+        params["sandbox"] = Json::string(value)
+      }
     None => ()
   }
   let result = self.dispatch(
@@ -804,6 +1024,10 @@ pub async fn BidiClient::script_remove_preload_script(
   self : BidiClient,
   script_id : String,
 ) -> Result[Unit, ClientError] {
+  match validate_non_empty_string(script_id, "script") {
+    Ok(_) => ()
+    Err(e) => return Err(e)
+  }
   let params : Map[String, Json] = {}
   params["script"] = Json::string(script_id)
   match
@@ -826,19 +1050,34 @@ pub async fn BidiClient::script_disown(
   sandbox? : String,
 ) -> Result[Unit, ClientError] {
   if handles.length() == 0 {
-    return Err(InvalidArgument(message="handles must not be empty"))
+    return Err(invalid_argument_error("handles must not be empty"))
   }
   let target : Map[String, Json] = {}
   match context_id {
-    Some(value) => target["context"] = Json::string(value)
-    None => return Err(InvalidArgument(message="context_id is required"))
+    Some(value) =>
+      if value.is_empty() {
+        return Err(invalid_argument_error("context must not be empty"))
+      } else {
+        target["context"] = Json::string(value)
+      }
+    None => return Err(invalid_argument_error("context is required"))
   }
   match sandbox {
-    Some(value) => target["sandbox"] = Json::string(value)
+    Some(value) =>
+      if value.is_empty() {
+        return Err(invalid_argument_error("sandbox must not be empty"))
+      } else {
+        target["sandbox"] = Json::string(value)
+      }
     None => ()
   }
   let handle_values : Array[Json] = []
   for handle in handles {
+    if handle.is_empty() {
+      return Err(
+        invalid_argument_error("handles must not contain empty values"),
+      )
+    }
     handle_values.push(Json::string(handle))
   }
   let params : Map[String, Json] = {}
@@ -857,10 +1096,18 @@ pub async fn BidiClient::input_perform_actions(
   actions : Array[Json],
   context_id? : String,
 ) -> Result[Unit, ClientError] {
+  if actions.length() == 0 {
+    return Err(invalid_argument_error("actions must not be empty"))
+  }
   let params : Map[String, Json] = {}
   params["actions"] = Json::array(actions)
   match context_id {
-    Some(ctx) => params["context"] = Json::string(ctx)
+    Some(ctx) =>
+      if ctx.is_empty() {
+        return Err(invalid_argument_error("context must not be empty"))
+      } else {
+        params["context"] = Json::string(ctx)
+      }
     None => ()
   }
   match
@@ -895,7 +1142,12 @@ pub async fn BidiClient::input_release_actions(
 ) -> Result[Unit, ClientError] {
   let params : Map[String, Json] = {}
   match context_id {
-    Some(ctx) => params["context"] = Json::string(ctx)
+    Some(ctx) =>
+      if ctx.is_empty() {
+        return Err(invalid_argument_error("context must not be empty"))
+      } else {
+        params["context"] = Json::string(ctx)
+      }
     None => ()
   }
   match
@@ -912,10 +1164,19 @@ pub async fn BidiClient::network_set_cache_behavior(
   cache_behavior : String,
   contexts? : Array[String],
 ) -> Result[Unit, ClientError] {
+  if not(is_supported_cache_behavior(cache_behavior)) {
+    return Err(
+      invalid_argument_error("cacheBehavior must be one of default|bypass"),
+    )
+  }
   let params : Map[String, Json] = {}
   params["cacheBehavior"] = Json::string(cache_behavior)
   match contexts {
     Some(items) => {
+      match validate_context_ids(items, "contexts") {
+        Ok(_) => ()
+        Err(e) => return Err(e)
+      }
       let json_contexts : Array[Json] = []
       for ctx in items {
         json_contexts.push(Json::string(ctx))
@@ -966,6 +1227,22 @@ pub async fn BidiClient::network_add_data_collector_typed(
   self : BidiClient,
   collector : NetworkDataCollector,
 ) -> Result[Unit, ClientError] {
+  if collector.data_types.length() == 0 {
+    return Err(invalid_argument_error("dataTypes must not be empty"))
+  }
+  for data_type in collector.data_types {
+    if not(is_supported_data_type(data_type)) {
+      return Err(invalid_argument_error("Invalid data type: " + data_type))
+    }
+  }
+  match collector.contexts {
+    Some(contexts) =>
+      match validate_context_ids(contexts, "contexts") {
+        Ok(_) => ()
+        Err(e) => return Err(e)
+      }
+    None => ()
+  }
   match
     self.dispatch(
       "network",
@@ -1016,14 +1293,264 @@ async fn BidiClient::wait_response(
 ///|
 /// Dispatch event to handlers
 fn BidiClient::dispatch_event(self : BidiClient, evt : BidiEvent) -> Unit {
+  if not(self.is_event_subscribed(evt)) {
+    return ()
+  }
   for handler in self.event_handlers {
     handler(evt)
   }
 }
 
 ///|
+fn BidiClient::is_event_subscribed(self : BidiClient, evt : BidiEvent) -> Bool {
+  if not(self.has_subscription_filter) {
+    return true
+  }
+  if self.global_subscriptions.contains(evt.event_method) {
+    return true
+  }
+  match get_string_field(evt.params, "context") {
+    Some(context_id) =>
+      match self.context_subscriptions.get(context_id) {
+        Some(events) => events.contains(evt.event_method)
+        None => false
+      }
+    None => false
+  }
+}
+
+///|
+fn BidiClient::apply_subscribe(
+  self : BidiClient,
+  events : Array[String],
+  contexts : Array[String]?,
+) -> Unit {
+  self.has_subscription_filter = true
+  match contexts {
+    Some(context_ids) =>
+      for context_id in context_ids {
+        let context_events = match self.context_subscriptions.get(context_id) {
+          Some(existing) => existing
+          None => {
+            let created : Map[String, Bool] = {}
+            self.context_subscriptions[context_id] = created
+            created
+          }
+        }
+        for event_name in events {
+          context_events[event_name] = true
+        }
+      }
+    None =>
+      for event_name in events {
+        self.global_subscriptions[event_name] = true
+      }
+  }
+}
+
+///|
+fn BidiClient::apply_unsubscribe(
+  self : BidiClient,
+  events : Array[String],
+  contexts : Array[String]?,
+) -> Unit {
+  match contexts {
+    Some(context_ids) =>
+      for context_id in context_ids {
+        match self.context_subscriptions.get(context_id) {
+          Some(context_events) => {
+            for event_name in events {
+              context_events.remove(event_name)
+            }
+            if context_events.is_empty() {
+              self.context_subscriptions.remove(context_id)
+            }
+          }
+          None => ()
+        }
+      }
+    None =>
+      for event_name in events {
+        self.global_subscriptions.remove(event_name)
+      }
+  }
+  self.has_subscription_filter = true
+}
+
+///|
 fn is_valid_navigation_wait(wait : String) -> Bool {
   wait == "none" || wait == "interactive" || wait == "complete"
+}
+
+///|
+fn is_supported_screenshot_format(format : String) -> Bool {
+  format == "image/png" ||
+  format == "image/jpeg" ||
+  format == "png" ||
+  format == "jpeg"
+}
+
+///|
+fn is_supported_cache_behavior(cache_behavior : String) -> Bool {
+  cache_behavior == "default" || cache_behavior == "bypass"
+}
+
+///|
+fn is_supported_data_type(data_type : String) -> Bool {
+  data_type == "request" || data_type == "response"
+}
+
+///|
+fn validate_non_empty_string(
+  value : String,
+  field_name : String,
+) -> Result[Unit, ClientError] {
+  if value.is_empty() {
+    Err(invalid_argument_error(field_name + " must not be empty"))
+  } else {
+    Ok(())
+  }
+}
+
+///|
+fn validate_serialization_options(
+  options : SerializationOptions,
+) -> Result[Unit, ClientError] {
+  match options.max_depth {
+    Some(depth) =>
+      if depth < 0 {
+        return Err(
+          invalid_argument_error(
+            "serializationOptions.maxDepth must be non-negative",
+          ),
+        )
+      } else {
+        ()
+      }
+    None => ()
+  }
+  match options.max_object_depth {
+    Some(depth) =>
+      if depth < 0 {
+        return Err(
+          invalid_argument_error(
+            "serializationOptions.maxObjectDepth must be non-negative",
+          ),
+        )
+      } else {
+        ()
+      }
+    None => ()
+  }
+  match options.include_shadow_tree {
+    Some(value) =>
+      if value != "none" && value != "open" && value != "all" {
+        return Err(
+          invalid_argument_error(
+            "serializationOptions.includeShadowTree must be one of none|open|all",
+          ),
+        )
+      } else {
+        ()
+      }
+    None => ()
+  }
+  Ok(())
+}
+
+///|
+fn validate_locator(locator : Json) -> Result[Unit, ClientError] {
+  let locator_type = match get_string_field(locator, "type") {
+    Some(value) => value
+    None => return Err(invalid_argument_error("locator.type is required"))
+  }
+  if locator_type == "css" || locator_type == "xpath" {
+    match get_string_field(locator, "value") {
+      Some(value) =>
+        if value.is_empty() {
+          Err(
+            invalid_argument_error(
+              "locator.value must be a non-empty string for " +
+              locator_type +
+              " locator",
+            ),
+          )
+        } else {
+          Ok(())
+        }
+      None =>
+        Err(
+          invalid_argument_error(
+            "locator.value must be a non-empty string for " +
+            locator_type +
+            " locator",
+          ),
+        )
+    }
+  } else {
+    Ok(())
+  }
+}
+
+///|
+fn invalid_argument_error(message : String) -> ClientError {
+  InvalidArgument(message="invalid argument: " + message)
+}
+
+///|
+fn unknown_command_error(domain : String, command : String) -> ClientError {
+  InvalidArgument(message="unknown command: " + domain + "." + command)
+}
+
+///|
+fn validate_subscription_request(
+  events : Array[String],
+  contexts : Array[String]?,
+) -> Result[Unit, ClientError] {
+  if events.length() == 0 {
+    return Err(invalid_argument_error("events must not be empty"))
+  }
+  for event_name in events {
+    if not(is_supported_event_name(event_name)) {
+      return Err(invalid_argument_error("Invalid event name: " + event_name))
+    }
+  }
+  match contexts {
+    Some(context_ids) => validate_context_ids(context_ids, "contexts")
+    None => Ok(())
+  }
+}
+
+///|
+fn validate_context_ids(
+  context_ids : Array[String],
+  field_name : String,
+) -> Result[Unit, ClientError] {
+  if context_ids.length() == 0 {
+    return Err(invalid_argument_error(field_name + " must not be empty"))
+  }
+  for context_id in context_ids {
+    if context_id.is_empty() {
+      return Err(
+        invalid_argument_error(field_name + " must not contain empty values"),
+      )
+    }
+  }
+  Ok(())
+}
+
+///|
+fn is_supported_event_name(event_name : String) -> Bool {
+  let domains = [
+    "session", "browser", "browsingContext", "script", "input", "network", "log",
+  ]
+  for domain in domains {
+    let prefix = domain + "."
+    if event_name.has_prefix(prefix) && event_name.length() > prefix.length() {
+      return true
+    }
+  }
+  false
 }
 
 ///|

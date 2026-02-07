@@ -381,7 +381,7 @@ async test "central dispatch rejects unsupported domain command" {
   let result = client.dispatch("session", "unknown")
   match result {
     Err(InvalidArgument(message~)) =>
-      assert_eq(message, "Unsupported command for session: unknown")
+      assert_eq(message, "unknown command: session.unknown")
     _ => assert_true(false)
   }
   inspect(sent.val.length(), content="0")
@@ -404,4 +404,98 @@ async test "browsingContext domain hook receives browsingContext event only" {
   })
   let _ = client.send("session.status")
   inspect(captured.val, content="1")
+}
+
+///|
+async test "session.subscribe supports contexts and filters events per context" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = {
+    val: [
+      "{\"id\":1,\"type\":\"success\",\"result\":{}}", "{\"type\":\"event\",\"method\":\"browsingContext.load\",\"params\":{\"context\":\"ctx-1\"}}",
+      "{\"type\":\"event\",\"method\":\"browsingContext.load\",\"params\":{\"context\":\"ctx-2\"}}",
+      "{\"id\":2,\"type\":\"success\",\"result\":{}}",
+    ],
+  }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0 }
+  client.on_event(fn(_evt : BidiEvent) { captured.val = captured.val + 1 })
+  let subscribe = client.session_subscribe(["browsingContext.load"], contexts=[
+    "ctx-1",
+  ])
+  match subscribe {
+    Ok(_) => ()
+    Err(_) => assert_true(false)
+  }
+  let _ = client.send("session.status")
+  assert_eq(captured.val, 1)
+  let subscribe_req = @json.parse(sent.val[0]) catch { _ => Json::null() }
+  let params = test_get_object_field(subscribe_req, "params").unwrap_or(
+    Json::object({}),
+  )
+  let contexts = test_get_array_field(params, "contexts").unwrap_or([])
+  assert_eq(contexts.length(), 1)
+}
+
+///|
+async test "session.unsubscribe removes context subscription" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = {
+    val: [
+      "{\"id\":1,\"type\":\"success\",\"result\":{}}", "{\"id\":2,\"type\":\"success\",\"result\":{}}",
+      "{\"type\":\"event\",\"method\":\"browsingContext.load\",\"params\":{\"context\":\"ctx-1\"}}",
+      "{\"id\":3,\"type\":\"success\",\"result\":{}}",
+    ],
+  }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0 }
+  client.on_event(fn(_evt : BidiEvent) { captured.val = captured.val + 1 })
+  let _ = client.session_subscribe(["browsingContext.load"], contexts=["ctx-1"])
+  let _ = client.session_unsubscribe(["browsingContext.load"], contexts=[
+    "ctx-1",
+  ])
+  let _ = client.send("session.status")
+  assert_eq(captured.val, 0)
+}
+
+///|
+async test "event order is preserved while waiting for response" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = {
+    val: [
+      "{\"type\":\"event\",\"method\":\"network.responseStarted\",\"params\":{}}",
+      "{\"type\":\"event\",\"method\":\"network.responseCompleted\",\"params\":{}}",
+      "{\"id\":1,\"type\":\"success\",\"result\":{}}",
+    ],
+  }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let captured : Ref[Array[String]] = { val: [] }
+  client.on_event(fn(evt : BidiEvent) { captured.val.push(evt.event_method) })
+  let _ = client.send("session.status")
+  assert_eq(captured.val.length(), 2)
+  assert_eq(captured.val[0], "network.responseStarted")
+  assert_eq(captured.val[1], "network.responseCompleted")
+}
+
+///|
+async test "session.subscribe validates event names and contexts" {
+  let sent : Ref[Array[String]] = { val: [] }
+  let recv_queue : Ref[Array[String]] = { val: [] }
+  let transport = make_mock_transport(sent, recv_queue)
+  let client = BidiClient::new(transport)
+  let invalid_event = client.session_subscribe(["invalid"])
+  match invalid_event {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(message, "invalid argument: Invalid event name: invalid")
+    _ => assert_true(false)
+  }
+  let empty_contexts = client.session_subscribe(["browsingContext.load"], contexts=[])
+  match empty_contexts {
+    Err(InvalidArgument(message~)) =>
+      assert_eq(message, "invalid argument: contexts must not be empty")
+    _ => assert_true(false)
+  }
+  assert_eq(sent.val.length(), 0)
 }
