@@ -1,6 +1,6 @@
 {
-  "name": "mizchi/webdriver.mbt",
-  "version": "0.1.0",
+  "name": "mizchi/webdriver",
+  "version": "0.1.1",
   "deps": {
     "moonbitlang/async": "0.16.2"
   },

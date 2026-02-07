@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/webdriver.mbt/bidi"
+package "mizchi/webdriver/bidi"
 
 // Values
 pub fn parse_incoming(String) -> Result[BidiIncoming, String]
@@ -7,6 +7,38 @@ pub fn parse_incoming(String) -> Result[BidiIncoming, String]
 // Errors
 
 // Types and methods
+pub struct AccessibilityLocator {
+  role : String
+  name : String?
+  exact : Bool?
+}
+pub impl Show for AccessibilityLocator
+
+pub enum ActionOrigin {
+  Viewport
+  Pointer
+  ElementHandle(handle~ : String)
+  ElementSharedId(shared_id~ : String)
+}
+pub fn ActionOrigin::element_handle(String) -> Self
+pub fn ActionOrigin::element_shared_id(String) -> Self
+pub fn ActionOrigin::pointer() -> Self
+pub fn ActionOrigin::to_json(Self) -> Json
+pub fn ActionOrigin::viewport() -> Self
+pub impl Show for ActionOrigin
+
+pub struct ActionSequence {
+  id : String
+  source_type : InputSourceType
+  actions : Array[InputAction]
+  parameters : PointerParameters?
+}
+pub fn ActionSequence::key(String, Array[InputAction]) -> Self
+pub fn ActionSequence::none(String, Array[InputAction]) -> Self
+pub fn ActionSequence::pointer(String, PointerType, Array[InputAction]) -> Self
+pub fn ActionSequence::to_json(Self) -> Json
+pub impl Show for ActionSequence
+
 pub struct BidiClient {
   transport : Transport
   mut next_id : Int
@@ -21,19 +53,24 @@ pub async fn BidiClient::browser_remove_user_context(Self, String) -> Result[Uni
 pub async fn BidiClient::browsing_context_close(Self, String) -> Result[Unit, ClientError]
 pub async fn BidiClient::browsing_context_create(Self, String, user_context? : String) -> Result[String, ClientError]
 pub async fn BidiClient::browsing_context_get_tree(Self) -> Result[Json, ClientError]
-pub async fn BidiClient::browsing_context_locate_nodes(Self, String, Json) -> Result[Json, ClientError]
+pub async fn BidiClient::browsing_context_locate_nodes(Self, String, Json, max_node_count? : Int, serialization_options? : SerializationOptions) -> Result[Json, ClientError]
+pub async fn BidiClient::browsing_context_locate_nodes_typed(Self, String, Locator, max_node_count? : Int, serialization_options? : SerializationOptions) -> Result[Json, ClientError]
 pub async fn BidiClient::browsing_context_navigate(Self, String, String, wait? : String) -> Result[NavigationResult, ClientError]
 pub async fn BidiClient::browsing_context_reload(Self, String) -> Result[Unit, ClientError]
 pub fn BidiClient::close(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::connect(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::input_perform_actions(Self, Array[Json], context_id? : String) -> Result[Unit, ClientError]
+pub async fn BidiClient::input_perform_actions_typed(Self, Array[ActionSequence], context_id? : String) -> Result[Unit, ClientError]
 pub async fn BidiClient::input_release_actions(Self, context_id? : String) -> Result[Unit, ClientError]
 pub async fn BidiClient::network_add_data_collector(Self) -> Result[Unit, ClientError]
+pub async fn BidiClient::network_add_data_collector_typed(Self, NetworkDataCollector) -> Result[Unit, ClientError]
 pub async fn BidiClient::network_set_cache_behavior(Self, String, contexts? : Array[String]) -> Result[Unit, ClientError]
+pub async fn BidiClient::network_set_cache_behavior_typed(Self, CacheBehavior, contexts? : Array[String]) -> Result[Unit, ClientError]
 pub fn BidiClient::new(Transport) -> Self
 pub fn BidiClient::on_event(Self, (BidiEvent) -> Unit) -> Unit
-pub async fn BidiClient::script_call_function(Self, String, String, arguments? : Array[Json], await_promise? : Bool) -> Result[Json, ClientError]
-pub async fn BidiClient::script_evaluate(Self, String, String, await_promise? : Bool) -> Result[Json, ClientError]
+pub async fn BidiClient::script_call_function(Self, String, String, arguments? : Array[Json], await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool, this_value? : Json) -> Result[Json, ClientError]
+pub async fn BidiClient::script_call_function_typed(Self, String, String, arguments? : Array[RemoteValue], await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool, this_value? : RemoteValue) -> Result[Json, ClientError]
+pub async fn BidiClient::script_evaluate(Self, String, String, await_promise? : Bool, result_ownership? : ResultOwnership, serialization_options? : SerializationOptions, user_activation? : Bool) -> Result[Json, ClientError]
 pub async fn BidiClient::send(Self, String, params? : Json?) -> Result[Json, ClientError]
 pub async fn BidiClient::session_end(Self) -> Result[Unit, ClientError]
 pub async fn BidiClient::session_new(Self, capabilities? : Json?) -> Result[SessionInfo, ClientError]
@@ -75,6 +112,15 @@ pub struct BidiResponse {
 }
 pub impl Show for BidiResponse
 
+pub struct CacheBehavior {
+  value : String
+}
+pub fn CacheBehavior::bypass() -> Self
+pub fn CacheBehavior::default() -> Self
+pub fn CacheBehavior::new(String) -> Self
+pub fn CacheBehavior::to_string(Self) -> String
+pub impl Show for CacheBehavior
+
 pub enum ClientError {
   Transport(TransportError)
   ParseError(message~ : String)
@@ -90,17 +136,135 @@ pub struct CustomTransport {
 }
 pub fn CustomTransport::new(() -> Result[Unit, TransportError], (String) -> Result[Unit, TransportError], () -> Result[String, TransportError], () -> Result[Unit, TransportError]) -> Self
 
+pub struct InnerTextLocator {
+  text : String
+  match_type : InnerTextMatchType
+  ignore_case : Bool
+}
+pub impl Show for InnerTextLocator
+
+pub enum InnerTextMatchType {
+  Full
+  Partial
+}
+pub fn InnerTextMatchType::full() -> Self
+pub fn InnerTextMatchType::partial() -> Self
+pub fn InnerTextMatchType::to_string(Self) -> String
+pub impl Eq for InnerTextMatchType
+pub impl Show for InnerTextMatchType
+
+pub enum InputAction {
+  Pause(duration~ : Int?)
+  PointerMove(x~ : Double, y~ : Double, origin~ : ActionOrigin, duration~ : Int?)
+  PointerDown(button~ : Int)
+  PointerUp(button~ : Int)
+  PointerCancel
+  KeyDown(value~ : String)
+  KeyUp(value~ : String)
+}
+pub fn InputAction::key_down(String) -> Self
+pub fn InputAction::key_up(String) -> Self
+pub fn InputAction::pause(duration? : Int) -> Self
+pub fn InputAction::pointer_cancel() -> Self
+pub fn InputAction::pointer_down(Int) -> Self
+pub fn InputAction::pointer_move(Double, Double, origin? : ActionOrigin, duration? : Int?) -> Self
+pub fn InputAction::pointer_up(Int) -> Self
+pub fn InputAction::to_json(Self) -> Json
+pub impl Show for InputAction
+
+pub enum InputSourceType {
+  Pointer
+  Key
+  NoneSource
+}
+pub fn InputSourceType::to_string(Self) -> String
+pub impl Eq for InputSourceType
+pub impl Show for InputSourceType
+
 pub struct JsWebSocketState {
   url : String
   socket_id : Ref[Int?]
   closed : Ref[Bool]
 }
 
+pub enum Locator {
+  Css(String)
+  Xpath(String)
+  InnerText(InnerTextLocator)
+  Accessibility(AccessibilityLocator)
+  Custom(type_name~ : String, value~ : Json)
+}
+pub fn Locator::accessibility(String, name? : String, exact? : Bool) -> Self
+pub fn Locator::css(String) -> Self
+pub fn Locator::custom(String, Json) -> Self
+pub fn Locator::inner_text(String, match_type? : InnerTextMatchType, ignore_case? : Bool) -> Self
+pub fn Locator::to_json(Self) -> Json
+pub fn Locator::xpath(String) -> Self
+pub impl Show for Locator
+
 pub struct NavigationResult {
   navigation : String
   url : String
 }
 pub impl Show for NavigationResult
+
+pub struct NetworkDataCollector {
+  data_types : Array[String]
+  contexts : Array[String]?
+}
+pub fn NetworkDataCollector::new(Array[String], contexts? : Array[String]) -> Self
+pub fn NetworkDataCollector::to_json(Self) -> Json
+pub impl Show for NetworkDataCollector
+
+pub struct PointerParameters {
+  pointer_type : PointerType
+}
+pub fn PointerParameters::to_json(Self) -> Json
+pub impl Show for PointerParameters
+
+pub enum PointerType {
+  Mouse
+  Pen
+  Touch
+}
+pub fn PointerType::mouse() -> Self
+pub fn PointerType::pen() -> Self
+pub fn PointerType::to_string(Self) -> String
+pub fn PointerType::touch() -> Self
+pub impl Eq for PointerType
+pub impl Show for PointerType
+
+pub struct RemoteValue {
+  json : Json
+}
+pub fn RemoteValue::boolean(Bool) -> Self
+pub fn RemoteValue::handle(String) -> Self
+pub fn RemoteValue::null() -> Self
+pub fn RemoteValue::number(Double) -> Self
+pub fn RemoteValue::shared_id(String) -> Self
+pub fn RemoteValue::string(String) -> Self
+pub fn RemoteValue::to_json(Self) -> Json
+pub fn RemoteValue::undefined() -> Self
+pub impl Show for RemoteValue
+
+pub enum ResultOwnership {
+  NoneOwnership
+  Root
+}
+pub fn ResultOwnership::none() -> Self
+pub fn ResultOwnership::root() -> Self
+pub fn ResultOwnership::to_string(Self) -> String
+pub impl Eq for ResultOwnership
+pub impl Show for ResultOwnership
+
+pub struct SerializationOptions {
+  max_depth : Int?
+  max_object_depth : Int?
+  include_shadow_tree : String?
+}
+pub fn SerializationOptions::new(max_depth? : Int, max_object_depth? : Int, include_shadow_tree? : String) -> Self
+pub fn SerializationOptions::to_json(Self) -> Json
+pub impl Show for SerializationOptions
 
 pub struct SessionInfo {
   session_id : String

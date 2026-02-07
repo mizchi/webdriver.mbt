@@ -344,10 +344,43 @@ pub async fn BidiClient::browsing_context_locate_nodes(
   self : BidiClient,
   context_id : String,
   locator : Json,
+  max_node_count? : Int,
+  serialization_options? : SerializationOptions,
 ) -> Result[Json, ClientError] {
   let params : Map[String, Json] = {}
   params["context"] = Json::string(context_id)
   params["locator"] = locator
+  match max_node_count {
+    Some(count) => params["maxNodeCount"] = Json::number(count.to_double())
+    None => ()
+  }
+  match serialization_options {
+    Some(opts) => params["serializationOptions"] = opts.to_json()
+    None => ()
+  }
+  self.send("browsingContext.locateNodes", params=Some(Json::object(params)))
+}
+
+///|
+/// browsingContext.locateNodes (typed)
+pub async fn BidiClient::browsing_context_locate_nodes_typed(
+  self : BidiClient,
+  context_id : String,
+  locator : Locator,
+  max_node_count? : Int,
+  serialization_options? : SerializationOptions,
+) -> Result[Json, ClientError] {
+  let params : Map[String, Json] = {}
+  params["context"] = Json::string(context_id)
+  params["locator"] = locator.to_json()
+  match max_node_count {
+    Some(count) => params["maxNodeCount"] = Json::number(count.to_double())
+    None => ()
+  }
+  match serialization_options {
+    Some(opts) => params["serializationOptions"] = opts.to_json()
+    None => ()
+  }
   self.send("browsingContext.locateNodes", params=Some(Json::object(params)))
 }
 
@@ -358,11 +391,27 @@ pub async fn BidiClient::script_evaluate(
   expression : String,
   context_id : String,
   await_promise? : Bool = true,
+  result_ownership? : ResultOwnership,
+  serialization_options? : SerializationOptions,
+  user_activation? : Bool,
 ) -> Result[Json, ClientError] {
   let params : Map[String, Json] = {}
   params["expression"] = Json::string(expression)
   params["target"] = Json::object({ "context": Json::string(context_id) })
   params["awaitPromise"] = Json::boolean(await_promise)
+  match result_ownership {
+    Some(ownership) =>
+      params["resultOwnership"] = Json::string(ownership.to_string())
+    None => ()
+  }
+  match serialization_options {
+    Some(opts) => params["serializationOptions"] = opts.to_json()
+    None => ()
+  }
+  match user_activation {
+    Some(active) => params["userActivation"] = Json::boolean(active)
+    None => ()
+  }
   self.send("script.evaluate", params=Some(Json::object(params)))
 }
 
@@ -374,12 +423,75 @@ pub async fn BidiClient::script_call_function(
   context_id : String,
   arguments? : Array[Json] = [],
   await_promise? : Bool = true,
+  result_ownership? : ResultOwnership,
+  serialization_options? : SerializationOptions,
+  user_activation? : Bool,
+  this_value? : Json,
 ) -> Result[Json, ClientError] {
   let params : Map[String, Json] = {}
   params["functionDeclaration"] = Json::string(function_declaration)
   params["target"] = Json::object({ "context": Json::string(context_id) })
   params["arguments"] = Json::array(arguments)
   params["awaitPromise"] = Json::boolean(await_promise)
+  match result_ownership {
+    Some(ownership) =>
+      params["resultOwnership"] = Json::string(ownership.to_string())
+    None => ()
+  }
+  match serialization_options {
+    Some(opts) => params["serializationOptions"] = opts.to_json()
+    None => ()
+  }
+  match user_activation {
+    Some(active) => params["userActivation"] = Json::boolean(active)
+    None => ()
+  }
+  match this_value {
+    Some(value) => params["this"] = value
+    None => ()
+  }
+  self.send("script.callFunction", params=Some(Json::object(params)))
+}
+
+///|
+/// script.callFunction (typed arguments)
+pub async fn BidiClient::script_call_function_typed(
+  self : BidiClient,
+  function_declaration : String,
+  context_id : String,
+  arguments? : Array[RemoteValue] = [],
+  await_promise? : Bool = true,
+  result_ownership? : ResultOwnership,
+  serialization_options? : SerializationOptions,
+  user_activation? : Bool,
+  this_value? : RemoteValue,
+) -> Result[Json, ClientError] {
+  let args_json : Array[Json] = []
+  for arg in arguments {
+    args_json.push(arg.to_json())
+  }
+  let params : Map[String, Json] = {}
+  params["functionDeclaration"] = Json::string(function_declaration)
+  params["target"] = Json::object({ "context": Json::string(context_id) })
+  params["arguments"] = Json::array(args_json)
+  params["awaitPromise"] = Json::boolean(await_promise)
+  match result_ownership {
+    Some(ownership) =>
+      params["resultOwnership"] = Json::string(ownership.to_string())
+    None => ()
+  }
+  match serialization_options {
+    Some(opts) => params["serializationOptions"] = opts.to_json()
+    None => ()
+  }
+  match user_activation {
+    Some(active) => params["userActivation"] = Json::boolean(active)
+    None => ()
+  }
+  match this_value {
+    Some(value) => params["this"] = value.to_json()
+    None => ()
+  }
   self.send("script.callFunction", params=Some(Json::object(params)))
 }
 
@@ -399,6 +511,23 @@ pub async fn BidiClient::input_perform_actions(
   match self.send("input.performActions", params=Some(Json::object(params))) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
+  }
+}
+
+///|
+/// input.performActions (typed)
+pub async fn BidiClient::input_perform_actions_typed(
+  self : BidiClient,
+  actions : Array[ActionSequence],
+  context_id? : String,
+) -> Result[Unit, ClientError] {
+  let actions_json : Array[Json] = []
+  for action in actions {
+    actions_json.push(action.to_json())
+  }
+  match context_id {
+    Some(ctx) => self.input_perform_actions(actions_json, context_id=ctx)
+    None => self.input_perform_actions(actions_json)
   }
 }
 
@@ -446,11 +575,38 @@ pub async fn BidiClient::network_set_cache_behavior(
 }
 
 ///|
+/// network.setCacheBehavior (typed)
+pub async fn BidiClient::network_set_cache_behavior_typed(
+  self : BidiClient,
+  cache_behavior : CacheBehavior,
+  contexts? : Array[String],
+) -> Result[Unit, ClientError] {
+  match contexts {
+    Some(list) =>
+      self.network_set_cache_behavior(cache_behavior.to_string(), contexts=list)
+    None => self.network_set_cache_behavior(cache_behavior.to_string())
+  }
+}
+
+///|
 /// network.addDataCollector
 pub async fn BidiClient::network_add_data_collector(
   self : BidiClient,
 ) -> Result[Unit, ClientError] {
   match self.send("network.addDataCollector") {
+    Ok(_) => Ok(())
+    Err(e) => Err(e)
+  }
+}
+
+///|
+/// network.addDataCollector (typed)
+pub async fn BidiClient::network_add_data_collector_typed(
+  self : BidiClient,
+  collector : NetworkDataCollector,
+) -> Result[Unit, ClientError] {
+  match
+    self.send("network.addDataCollector", params=Some(collector.to_json())) {
     Ok(_) => Ok(())
     Err(e) => Err(e)
   }
