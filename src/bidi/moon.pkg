@@ -1,9 +1,11 @@
 import {
   "moonbitlang/async",
   "moonbitlang/async/js_async",
-  "moonbitlang/async/websocket" as @websocket,
+  "moonbitlang/async/websocket" @websocket,
   "moonbitlang/core/json",
 }
+
+warnings = "-29"
 
 options(
   targets: {
