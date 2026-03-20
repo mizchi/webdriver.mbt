@@ -1,7 +1,7 @@
 ///| Chrome BiDi Pipe Transport (JS target)
 ///|
-///| Launches Chrome with --remote-debugging-pipe and communicates
-///| via stdio fd 3 (write) and fd 4 (read) using null-delimited JSON.
+///| Launches Chrome with --remote-debugging-pipe + --enable-features=WebDriverBiDi
+///| and communicates via stdio fd 3 (write) and fd 4 (read) using null-delimited JSON.
 
 ///|
 /// Launch Chrome with BiDi pipe and return a connected transport.
@@ -10,7 +10,7 @@ pub fn Transport::chrome_bidi_pipe(headless? : Bool = true) -> Transport {
 }
 
 ///|
-fn ensure_chrome_pipe_connected(
+async fn ensure_chrome_pipe_connected(
   state : ChromePipeState,
 ) -> Result[Int, TransportError] {
   if state.closed.val {
@@ -19,9 +19,11 @@ fn ensure_chrome_pipe_connected(
   match state.proc_id.val {
     Some(id) => Ok(id)
     None => {
-      let id = ffi_launch_chrome_pipe(state.headless)
+      let id = @js_async.Promise::wait(ffi_launch_chrome_pipe(state.headless)) catch {
+        e => return Err(NetworkError(message=e.to_string()))
+      }
       if id < 0 {
-        Err(NetworkError(message="Failed to launch Chrome with BiDi pipe"))
+        Err(NetworkError(message="Chrome not found. Set CHROME_PATH env var."))
       } else {
         state.proc_id.val = Some(id)
         Ok(id)
@@ -31,15 +33,15 @@ fn ensure_chrome_pipe_connected(
 }
 
 // =============================================================================
-// FFI: Chrome process management with BiDi pipe
+// FFI: Chrome process management with BiDi pipe (ESM-compatible)
 // =============================================================================
 
 ///|
-extern "js" fn ffi_launch_chrome_pipe(headless : Bool) -> Int =
-  #| (headless) => {
-  #|   const { spawnSync, spawn } = require('node:child_process');
-  #|   const { existsSync } = require('node:fs');
-  #|   const os = require('node:os');
+extern "js" fn ffi_launch_chrome_pipe(headless : Bool) -> @js_async.Promise[Int] =
+  #| async (headless) => {
+  #|   const { spawn } = await import('node:child_process');
+  #|   const { existsSync } = await import('node:fs');
+  #|   const os = await import('node:os');
   #|
   #|   const candidates = [
   #|     process.env.CHROME_PATH,
@@ -65,6 +67,7 @@ extern "js" fn ffi_launch_chrome_pipe(headless : Bool) -> Int =
   #|   const args = [
   #|     headless ? '--headless=new' : '',
   #|     '--remote-debugging-pipe',
+  #|     '--enable-features=WebDriverBiDi',
   #|     '--no-first-run',
   #|     '--no-default-browser-check',
   #|     '--disable-background-networking',
@@ -79,13 +82,12 @@ extern "js" fn ffi_launch_chrome_pipe(headless : Bool) -> Int =
   #|     '--user-data-dir=' + os.tmpdir() + '/mbt-bidi-' + process.pid + '-' + id,
   #|   ].filter(Boolean);
   #|
-  #|   // Chrome with --remote-debugging-pipe uses fd 3 (write to Chrome) and fd 4 (read from Chrome)
   #|   const proc = spawn(chromePath, args, {
   #|     stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
   #|   });
   #|
-  #|   const writePipe = proc.stdio[3]; // We write commands here
-  #|   const readPipe = proc.stdio[4];  // We read responses here
+  #|   const writePipe = proc.stdio[3];
+  #|   const readPipe = proc.stdio[4];
   #|
   #|   const queue = [];
   #|   const waiters = [];
@@ -94,7 +96,6 @@ extern "js" fn ffi_launch_chrome_pipe(headless : Bool) -> Int =
   #|   readPipe.setEncoding('utf8');
   #|   readPipe.on('data', (chunk) => {
   #|     buf += chunk;
-  #|     // BiDi pipe uses \0 as message delimiter
   #|     let idx;
   #|     while ((idx = buf.indexOf('\0')) !== -1) {
   #|       const msg = buf.slice(0, idx);
@@ -122,7 +123,6 @@ extern "js" fn ffi_chrome_pipe_send(id : Int, message : String) -> Unit =
   #| (id, message) => {
   #|   const entry = globalThis.__chrome_pipes?.procs.get(id);
   #|   if (!entry) throw new Error('Chrome pipe not found');
-  #|   // BiDi pipe uses \0 as message delimiter
   #|   entry.writePipe.write(message + '\0');
   #| }
 
