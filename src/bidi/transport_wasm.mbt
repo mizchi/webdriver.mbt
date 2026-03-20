@@ -41,6 +41,7 @@ pub async fn Transport::connect(
   async_marker()
   match self {
     JsWebSocket(_) => Err(wasm_not_supported())
+    ChromePipe(_) => Err(wasm_not_supported())
     Custom(custom) => (custom.connect)()
     Unsupported(err) => Err(err)
   }
@@ -58,6 +59,7 @@ pub async fn Transport::send(
       let _ = message
       Err(wasm_not_supported())
     }
+    ChromePipe(_) => Err(wasm_not_supported())
     Custom(custom) => (custom.send)(message)
     Unsupported(err) => Err(err)
   }
@@ -71,6 +73,7 @@ pub async fn Transport::recv(
   async_marker()
   match self {
     JsWebSocket(_) => Err(wasm_not_supported())
+    ChromePipe(_) => Err(wasm_not_supported())
     Custom(custom) => (custom.recv)()
     Unsupported(err) => Err(err)
   }
@@ -81,6 +84,7 @@ pub async fn Transport::recv(
 pub fn Transport::close(self : Transport) -> Result[Unit, TransportError] {
   match self {
     JsWebSocket(_) => Err(wasm_not_supported())
+    ChromePipe(_) => Err(wasm_not_supported())
     Custom(custom) => (custom.close)()
     Unsupported(err) => Err(err)
   }

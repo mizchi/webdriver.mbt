@@ -130,6 +130,7 @@ pub async fn Transport::connect(
         Ok(_) => Ok(())
         Err(e) => Err(e)
       }
+    ChromePipe(state) => ensure_chrome_pipe_connected(state).map(fn(_) { () })
     Custom(custom) => (custom.connect)()
     Unsupported(err) => Err(err)
   }
@@ -146,6 +147,14 @@ pub async fn Transport::send(
       match ensure_js_connected(state) {
         Ok(id) => {
           ws_send(id, message)
+          Ok(())
+        }
+        Err(e) => Err(e)
+      }
+    ChromePipe(state) =>
+      match ensure_chrome_pipe_connected(state) {
+        Ok(id) => {
+          ffi_chrome_pipe_send(id, message)
           Ok(())
         }
         Err(e) => Err(e)
@@ -177,6 +186,26 @@ pub async fn Transport::recv(
         }
         Err(e) => Err(e)
       }
+    ChromePipe(state) =>
+      if state.closed.val {
+        Err(Closed)
+      } else {
+        match ensure_chrome_pipe_connected(state) {
+          Ok(id) => {
+            let msg = @js_async.Promise::wait(ffi_chrome_pipe_recv(id)) catch {
+              err => return Err(NetworkError(message=err.to_string()))
+            }
+            match msg {
+              Some(value) => Ok(value)
+              None => {
+                state.closed.val = true
+                Err(Closed)
+              }
+            }
+          }
+          Err(e) => Err(e)
+        }
+      }
     Custom(custom) => (custom.recv)()
     Unsupported(err) => Err(err)
   }
@@ -189,6 +218,14 @@ pub fn Transport::close(self : Transport) -> Result[Unit, TransportError] {
     JsWebSocket(state) => {
       match state.socket_id.val {
         Some(id) => ws_close(id)
+        None => ()
+      }
+      state.closed.val = true
+      Ok(())
+    }
+    ChromePipe(state) => {
+      match state.proc_id.val {
+        Some(id) => ffi_chrome_pipe_close(id)
         None => ()
       }
       state.closed.val = true

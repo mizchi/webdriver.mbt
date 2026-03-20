@@ -23,8 +23,22 @@ pub fn CustomTransport::new(
 
 ///|
 /// Transport (JS WebSocket / Custom / Unsupported)
+///|
+/// Chrome BiDi pipe transport state
+pub struct ChromePipeState {
+  headless : Bool
+  proc_id : Ref[Int?]
+  closed : Ref[Bool]
+}
+
+///|
+fn ChromePipeState::new(headless : Bool) -> ChromePipeState {
+  { headless, proc_id: { val: None }, closed: { val: false } }
+}
+
 pub enum Transport {
   JsWebSocket(JsWebSocketState)
+  ChromePipe(ChromePipeState)
   Custom(CustomTransport)
   Unsupported(TransportError)
 }

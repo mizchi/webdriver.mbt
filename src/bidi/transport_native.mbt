@@ -52,6 +52,7 @@ pub async fn Transport::connect(
         Ok(_) => Ok(())
         Err(e) => Err(e)
       }
+    ChromePipe(_) => Err(NotSupported(message="ChromePipe not supported on native"))
     Custom(custom) => (custom.connect)()
     Unsupported(err) => Err(err)
   }
@@ -75,6 +76,7 @@ pub async fn Transport::send(
           }
         Err(e) => Err(e)
       }
+    ChromePipe(_) => Err(NotSupported(message="ChromePipe not supported on native"))
     Custom(custom) => (custom.send)(message)
     Unsupported(err) => Err(err)
   }
@@ -98,6 +100,7 @@ pub async fn Transport::recv(
           }
         Err(e) => Err(e)
       }
+    ChromePipe(_) => Err(NotSupported(message="ChromePipe not supported on native"))
     Custom(custom) => (custom.recv)()
     Unsupported(err) => Err(err)
   }
@@ -112,6 +115,10 @@ pub fn Transport::close(self : Transport) -> Result[Unit, TransportError] {
         Some(conn) => conn.close()
         None => ()
       }
+      state.closed.val = true
+      Ok(())
+    }
+    ChromePipe(state) => {
       state.closed.val = true
       Ok(())
     }

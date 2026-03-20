@@ -12,6 +12,7 @@ options(
     "client_test.mbt": [ "js", "native" ],
     "e2e_test.mbt": [ "js" ],
     "transport_js.mbt": [ "js" ],
+    "transport_pipe_js.mbt": [ "js" ],
     "transport_native.mbt": [ "native" ],
     "transport_wasm.mbt": [ "wasm", "wasm-gc" ],
   },
