@@ -233,7 +233,7 @@ pub async fn BidiClient::dispatch(
   command : String,
   params? : Json? = None,
 ) -> Result[Json, ClientError] {
-  if not(is_supported_domain_command(domain, command)) {
+  if !(is_supported_domain_command(domain, command)) {
     return Err(unknown_command_error(domain, command))
   }
   self.send(domain + "." + command, params~)
@@ -593,7 +593,7 @@ pub async fn BidiClient::browsing_context_navigate(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  if not(is_valid_navigation_wait(wait)) {
+  if !(is_valid_navigation_wait(wait)) {
     return Err(
       invalid_argument_error("wait must be one of none|interactive|complete"),
     )
@@ -649,7 +649,7 @@ pub async fn BidiClient::browsing_context_capture_screenshot(
   }
   match format {
     Some(value) =>
-      if not(is_supported_screenshot_format(value)) {
+      if !(is_supported_screenshot_format(value)) {
         return Err(
           invalid_argument_error(
             "format must be one of image/png|image/jpeg|png|jpeg",
@@ -1164,7 +1164,7 @@ pub async fn BidiClient::network_set_cache_behavior(
   cache_behavior : String,
   contexts? : Array[String],
 ) -> Result[Unit, ClientError] {
-  if not(is_supported_cache_behavior(cache_behavior)) {
+  if !(is_supported_cache_behavior(cache_behavior)) {
     return Err(
       invalid_argument_error("cacheBehavior must be one of default|bypass"),
     )
@@ -1231,7 +1231,7 @@ pub async fn BidiClient::network_add_data_collector_typed(
     return Err(invalid_argument_error("dataTypes must not be empty"))
   }
   for data_type in collector.data_types {
-    if not(is_supported_data_type(data_type)) {
+    if !(is_supported_data_type(data_type)) {
       return Err(invalid_argument_error("Invalid data type: " + data_type))
     }
   }
@@ -1293,7 +1293,7 @@ async fn BidiClient::wait_response(
 ///|
 /// Dispatch event to handlers
 fn BidiClient::dispatch_event(self : BidiClient, evt : BidiEvent) -> Unit {
-  if not(self.is_event_subscribed(evt)) {
+  if !(self.is_event_subscribed(evt)) {
     return ()
   }
   for handler in self.event_handlers {
@@ -1303,7 +1303,7 @@ fn BidiClient::dispatch_event(self : BidiClient, evt : BidiEvent) -> Unit {
 
 ///|
 fn BidiClient::is_event_subscribed(self : BidiClient, evt : BidiEvent) -> Bool {
-  if not(self.has_subscription_filter) {
+  if !(self.has_subscription_filter) {
     return true
   }
   if self.global_subscriptions.contains(evt.event_method) {
@@ -1511,7 +1511,7 @@ fn validate_subscription_request(
     return Err(invalid_argument_error("events must not be empty"))
   }
   for event_name in events {
-    if not(is_supported_event_name(event_name)) {
+    if !(is_supported_event_name(event_name)) {
       return Err(invalid_argument_error("Invalid event name: " + event_name))
     }
   }

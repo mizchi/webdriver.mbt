@@ -99,7 +99,7 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     if url.is_empty() {
       return Err(InvalidArgument(message="url must not be empty"))
     }
-    if not(self.state.val.contexts.contains(context_id)) {
+    if !(self.state.val.contexts.contains(context_id)) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     let nav_id = self.state.val.next_navigation_id
@@ -112,7 +112,7 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     expression : String,
     _await_promise : Bool,
   ) -> Result[Json, BackendError] {
-    if not(self.state.val.contexts.contains(context_id)) {
+    if !(self.state.val.contexts.contains(context_id)) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     if expression == "1 + 1" {
@@ -143,7 +143,7 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     locator : Json,
     max_node_count : Int?,
   ) -> Result[Array[NodeReference], BackendError] {
-    if not(self.state.val.contexts.contains(context_id)) {
+    if !(self.state.val.contexts.contains(context_id)) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     let node_count = match max_node_count {
@@ -208,7 +208,7 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     context_id : String,
     _format : String?,
   ) -> Result[String, BackendError] {
-    if not(self.state.val.contexts.contains(context_id)) {
+    if !(self.state.val.contexts.contains(context_id)) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     Ok("mock-screenshot:" + context_id)

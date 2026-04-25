@@ -429,14 +429,14 @@ async test "bidi e2e" {
   }
   let session_info = client.session_new()
   match session_info {
-    Ok(info) => assert_true(not(info.session_id.is_empty()))
+    Ok(info) => assert_true(!(info.session_id.is_empty()))
     Err(_) => assert_true(false)
   }
   let user_context = match client.browser_create_user_context() {
     Ok(value) => value
     Err(_) => ""
   }
-  assert_true(not(user_context.is_empty()))
+  assert_true(!(user_context.is_empty()))
   let contexts = client.browser_get_user_contexts()
   match contexts {
     Ok(list) => assert_true(list.length() >= 2)
@@ -446,7 +446,7 @@ async test "bidi e2e" {
     Ok(v) => v
     Err(_) => ""
   }
-  assert_true(not(ctx.is_empty()))
+  assert_true(!(ctx.is_empty()))
   let tree = client.browsing_context_get_tree()
   match tree {
     Ok(json) =>
@@ -505,7 +505,7 @@ async test "bidi e2e" {
   }
   let screenshot = client.browsing_context_capture_screenshot(ctx)
   match screenshot {
-    Ok(data) => assert_true(not(data.is_empty()))
+    Ok(data) => assert_true(!(data.is_empty()))
     Err(_) => assert_true(false)
   }
   let args : Array[Json] = [e2e_make_number_arg(6.0), e2e_make_number_arg(7.0)]
