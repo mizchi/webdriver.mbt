@@ -15,6 +15,84 @@ pub fn BidiRequest::to_json(self : BidiRequest) -> String {
 }
 
 ///|
+/// Parse incoming command request JSON for BiDi server implementations.
+pub fn parse_request(json_str : String) -> Result[BidiRequest, String] {
+  let json = @json.parse(json_str) catch { _ => return Err("Invalid JSON") }
+  match json {
+    Object(map) => parse_request_map(map)
+    _ => Err("Invalid JSON")
+  }
+}
+
+///|
+fn parse_request_map(map : Map[String, Json]) -> Result[BidiRequest, String] {
+  let id = match map.get("id") {
+    Some(Number(n, ..)) =>
+      if n.trunc() == n {
+        n.to_int()
+      } else {
+        return Err("Invalid id field")
+      }
+    _ => return Err("Missing id field")
+  }
+  let method_name = match map.get("method") {
+    Some(String(method_name)) => method_name
+    _ => return Err("Missing method field")
+  }
+  Ok({ id, method_name, params: map.get("params") })
+}
+
+///|
+/// Serialize a WebDriver BiDi success response envelope.
+pub fn success_response_to_json(id : Int, result : Json?) -> String {
+  let obj : Map[String, Json] = {}
+  obj["id"] = Json::number(id.to_double())
+  obj["type"] = Json::string("success")
+  match result {
+    Some(value) => obj["result"] = value
+    None => obj["result"] = Json::object({})
+  }
+  Json::object(obj).stringify()
+}
+
+///|
+/// Serialize a WebDriver BiDi error response envelope.
+pub fn error_response_to_json(
+  id : Int,
+  code : String,
+  message : String,
+) -> String {
+  error_response_to_json_with_stacktrace(id, code, message, "")
+}
+
+///|
+/// Serialize a WebDriver BiDi error response envelope with stacktrace.
+pub fn error_response_to_json_with_stacktrace(
+  id : Int,
+  code : String,
+  message : String,
+  stacktrace : String,
+) -> String {
+  let obj : Map[String, Json] = {}
+  obj["id"] = Json::number(id.to_double())
+  obj["type"] = Json::string("error")
+  obj["error"] = Json::string(code)
+  obj["message"] = Json::string(message)
+  obj["stacktrace"] = Json::string(stacktrace)
+  Json::object(obj).stringify()
+}
+
+///|
+/// Serialize a WebDriver BiDi event envelope.
+pub fn event_to_json(event_method : String, params : Json) -> String {
+  Json::object({
+    "type": Json::string("event"),
+    "method": Json::string(event_method),
+    "params": params,
+  }).stringify()
+}
+
+///|
 /// Parse incoming message (response/event)
 pub fn parse_incoming(json_str : String) -> Result[BidiIncoming, String] {
   let json = @json.parse(json_str) catch { _ => return Err("Invalid JSON") }

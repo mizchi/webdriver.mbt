@@ -2,7 +2,17 @@
 package "mizchi/webdriver/bidi"
 
 // Values
+pub fn error_response_to_json(Int, String, String) -> String
+
+pub fn error_response_to_json_with_stacktrace(Int, String, String, String) -> String
+
+pub fn event_to_json(String, Json) -> String
+
 pub fn parse_incoming(String) -> Result[BidiIncoming, String]
+
+pub fn parse_request(String) -> Result[BidiRequest, String]
+
+pub fn success_response_to_json(Int, Json?) -> String
 
 // Errors
 
