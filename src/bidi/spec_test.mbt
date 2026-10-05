@@ -2,13 +2,13 @@
 fn make_mock_transport_spec(
   sent : Ref[Array[String]],
   recv_queue : Ref[Array[String]],
-) -> Transport {
-  let connect = fn() -> Result[Unit, TransportError] { Ok(()) }
-  let send = fn(message : String) -> Result[Unit, TransportError] {
+) -> @bidi.Transport {
+  let connect = fn() -> Result[Unit, @bidi.TransportError] { Ok(()) }
+  let send = fn(message : String) -> Result[Unit, @bidi.TransportError] {
     sent.val.push(message)
     Ok(())
   }
-  let recv = fn() -> Result[String, TransportError] {
+  let recv = fn() -> Result[String, @bidi.TransportError] {
     if recv_queue.val.length() == 0 {
       Ok("{\"id\":0,\"type\":\"success\",\"result\":{}}")
     } else {
@@ -16,8 +16,10 @@ fn make_mock_transport_spec(
       Ok(head)
     }
   }
-  let close = fn() -> Result[Unit, TransportError] { Ok(()) }
-  Transport::custom(CustomTransport::new(connect, send, recv, close))
+  let close = fn() -> Result[Unit, @bidi.TransportError] { Ok(()) }
+  @bidi.Transport::custom(
+    @bidi.CustomTransport::new(connect, send, recv, close),
+  )
 }
 
 ///|
@@ -83,16 +85,16 @@ fn get_array_field(json : Json, key : String) -> Array[Json]? {
 
 ///|
 test "locator css to_json" {
-  let json = Locator::css("#app").to_json()
+  let json = @bidi.Locator::css("#app").to_json()
   assert_eq(get_string_field(json, "type"), Some("css"))
   assert_eq(get_string_field(json, "value"), Some("#app"))
 }
 
 ///|
 test "locator innerText to_json" {
-  let json = Locator::inner_text(
+  let json = @bidi.Locator::inner_text(
     "Hello",
-    match_type=InnerTextMatchType::full(),
+    match_type=@bidi.InnerTextMatchType::full(),
     ignore_case=true,
   ).to_json()
   assert_eq(get_string_field(json, "type"), Some("innerText"))
@@ -104,12 +106,20 @@ test "locator innerText to_json" {
 
 ///|
 test "input action sequence pointer to_json" {
-  let actions : Array[InputAction] = [
-    InputAction::pointer_move(10.0, 20.0, origin=ActionOrigin::viewport()),
-    InputAction::pointer_down(0),
-    InputAction::pointer_up(0),
+  let actions : Array[@bidi.InputAction] = [
+    @bidi.InputAction::pointer_move(
+      10.0,
+      20.0,
+      origin=@bidi.ActionOrigin::viewport(),
+    ),
+    @bidi.InputAction::pointer_down(0),
+    @bidi.InputAction::pointer_up(0),
   ]
-  let seq = ActionSequence::pointer("mouse-1", PointerType::mouse(), actions)
+  let seq = @bidi.ActionSequence::pointer(
+    "mouse-1",
+    @bidi.PointerType::mouse(),
+    actions,
+  )
   let json = seq.to_json()
   assert_eq(get_string_field(json, "type"), Some("pointer"))
   assert_eq(get_string_field(json, "id"), Some("mouse-1"))
@@ -124,20 +134,20 @@ test "input action sequence pointer to_json" {
 
 ///|
 test "remote value handle/sharedId to_json" {
-  let handle_json = RemoteValue::handle("h-1").to_json()
+  let handle_json = @bidi.RemoteValue::handle("h-1").to_json()
   assert_eq(get_string_field(handle_json, "handle"), Some("h-1"))
-  let shared_json = RemoteValue::shared_id("s-1").to_json()
+  let shared_json = @bidi.RemoteValue::shared_id("s-1").to_json()
   assert_eq(get_string_field(shared_json, "sharedId"), Some("s-1"))
 }
 
 ///|
 async test "browsingContext.locateNodes typed builds params" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
-  let locator = Locator::css("div.item")
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let locator = @bidi.Locator::css("div.item")
   let result = client.browsing_context_locate_nodes_typed(
     "ctx-1",
     locator,
@@ -164,18 +174,26 @@ async test "browsingContext.locateNodes typed builds params" {
 
 ///|
 async test "input.performActions typed builds params" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
-  let actions : Array[InputAction] = [
-    InputAction::pointer_move(1.0, 2.0, origin=ActionOrigin::viewport()),
-    InputAction::pointer_down(0),
-    InputAction::pointer_up(0),
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let actions : Array[@bidi.InputAction] = [
+    @bidi.InputAction::pointer_move(
+      1.0,
+      2.0,
+      origin=@bidi.ActionOrigin::viewport(),
+    ),
+    @bidi.InputAction::pointer_down(0),
+    @bidi.InputAction::pointer_up(0),
   ]
-  let seqs : Array[ActionSequence] = [
-    ActionSequence::pointer("mouse-1", PointerType::mouse(), actions),
+  let seqs : Array[@bidi.ActionSequence] = [
+    @bidi.ActionSequence::pointer(
+      "mouse-1",
+      @bidi.PointerType::mouse(),
+      actions,
+    ),
   ]
   let result = client.input_perform_actions_typed(seqs)
   match result {
@@ -194,14 +212,14 @@ async test "input.performActions typed builds params" {
 
 ///|
 async test "script.callFunction typed builds handle/sharedId args" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
-  let args : Array[RemoteValue] = [
-    RemoteValue::handle("h-1"),
-    RemoteValue::shared_id("s-1"),
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let args : Array[@bidi.RemoteValue] = [
+    @bidi.RemoteValue::handle("h-1"),
+    @bidi.RemoteValue::shared_id("s-1"),
   ]
   let result = client.script_call_function_typed(
     "(a, b) => a",
@@ -223,12 +241,12 @@ async test "script.callFunction typed builds handle/sharedId args" {
 
 ///|
 async test "network.addDataCollector typed builds params" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
-  let collector = NetworkDataCollector::new(["request", "response"], contexts=[
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let collector = @bidi.NetworkDataCollector::new(["request", "response"], contexts=[
     "ctx-1",
   ])
   let result = client.network_add_data_collector_typed(collector)
@@ -252,11 +270,11 @@ async test "network.addDataCollector typed builds params" {
 
 ///|
 async test "browsingContext.getTree supports root/maxDepth options" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{\"contexts\":[]}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.browsing_context_get_tree(root="ctx-root", max_depth=2)
   match result {
     Ok(_) => ()
@@ -276,9 +294,9 @@ async test "browsingContext.getTree supports root/maxDepth options" {
 
 ///|
 async test "browsingContext.navigate validates wait value" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([])
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.browsing_context_navigate(
     "ctx-1",
     "https://example.com",
@@ -296,11 +314,11 @@ async test "browsingContext.navigate validates wait value" {
 
 ///|
 async test "browsingContext.captureScreenshot builds params and parses data" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{\"data\":\"abcd\"}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.browsing_context_capture_screenshot(
     "ctx-1",
     format="image/jpeg",
@@ -325,14 +343,14 @@ async test "browsingContext.captureScreenshot builds params and parses data" {
 
 ///|
 async test "script.addPreloadScript builds params and parses script id" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{\"script\":\"script-1\"}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.script_add_preload_script(
     "(() => 1)",
-    arguments=[RemoteValue::number(1.0)],
+    arguments=[@bidi.RemoteValue::number(1.0)],
     contexts=["ctx-1"],
     user_contexts=["default"],
     sandbox="main",
@@ -361,11 +379,11 @@ async test "script.addPreloadScript builds params and parses script id" {
 
 ///|
 async test "script.removePreloadScript builds params" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.script_remove_preload_script("script-1")
   match result {
     Ok(_) => ()
@@ -384,11 +402,11 @@ async test "script.removePreloadScript builds params" {
 
 ///|
 async test "script.disown builds params" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.script_disown(
     ["h-1", "h-2"],
     context_id="ctx-1",
@@ -412,14 +430,14 @@ async test "script.disown builds params" {
 
 ///|
 async test "browsingContext.locateNodes typed refs parses handle/sharedId" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([
     "{\"id\":1,\"type\":\"success\",\"result\":{\"nodes\":[{\"sharedId\":\"node-1\"},{\"handle\":\"h-2\"}]}}",
   ])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.browsing_context_locate_nodes_typed_refs(
     "ctx-1",
-    Locator::css("body"),
+    @bidi.Locator::css("body"),
   )
   match result {
     Ok(nodes) => {
@@ -435,9 +453,9 @@ async test "browsingContext.locateNodes typed refs parses handle/sharedId" {
 
 ///|
 async test "browsingContext.locateNodes validates params strictly" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([])
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let empty_context = client.browsing_context_locate_nodes(
     "",
     Json::object({ "type": Json::string("css"), "value": Json::string("body") }),
@@ -474,9 +492,9 @@ async test "browsingContext.locateNodes validates params strictly" {
 
 ///|
 async test "network.setCacheBehavior validates params strictly" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([])
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.network_set_cache_behavior("invalid")
   match result {
     Err(InvalidArgument(message~)) =>
@@ -490,9 +508,9 @@ async test "network.setCacheBehavior validates params strictly" {
 
 ///|
 async test "session.new validates capabilities object" {
-  let sent : Ref[Array[String]] = Ref::new([])
-  let recv_queue : Ref[Array[String]] = Ref::new([])
-  let client = BidiClient::new(make_mock_transport_spec(sent, recv_queue))
+  let sent : Ref[Array[String]] = Ref([])
+  let recv_queue : Ref[Array[String]] = Ref([])
+  let client = @bidi.BidiClient::new(make_mock_transport_spec(sent, recv_queue))
   let result = client.session_new(capabilities=Some(Json::string("bad")))
   match result {
     Err(InvalidArgument(message~)) =>

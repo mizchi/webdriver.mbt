@@ -12,7 +12,7 @@ pub struct JsWebSocketState {
 ///|
 /// Create JS WebSocket state
 fn JsWebSocketState::new(url : String) -> JsWebSocketState {
-  { url, conn: { val: None }, closed: { val: false } }
+  { url, conn: { val: None, }, closed: { val: false, }, }
 }
 
 ///|
@@ -52,7 +52,8 @@ pub async fn Transport::connect(
         Ok(_) => Ok(())
         Err(e) => Err(e)
       }
-    ChromePipe(_) => Err(NotSupported(message="ChromePipe not supported on native"))
+    ChromePipe(_) =>
+      Err(NotSupported(message="ChromePipe not supported on native"))
     Custom(custom) => (custom.connect)()
     Unsupported(err) => Err(err)
   }
@@ -76,7 +77,8 @@ pub async fn Transport::send(
           }
         Err(e) => Err(e)
       }
-    ChromePipe(_) => Err(NotSupported(message="ChromePipe not supported on native"))
+    ChromePipe(_) =>
+      Err(NotSupported(message="ChromePipe not supported on native"))
     Custom(custom) => (custom.send)(message)
     Unsupported(err) => Err(err)
   }
@@ -100,7 +102,8 @@ pub async fn Transport::recv(
           }
         Err(e) => Err(e)
       }
-    ChromePipe(_) => Err(NotSupported(message="ChromePipe not supported on native"))
+    ChromePipe(_) =>
+      Err(NotSupported(message="ChromePipe not supported on native"))
     Custom(custom) => (custom.recv)()
     Unsupported(err) => Err(err)
   }

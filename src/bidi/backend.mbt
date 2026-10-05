@@ -3,7 +3,7 @@
 pub enum BackendError {
   InvalidArgument(message~ : String)
   NotFound(message~ : String)
-} derive(Show, Eq)
+} derive(Eq)
 
 ///|
 /// Backend capability flags
@@ -13,7 +13,7 @@ pub struct BackendCapabilities {
   element_lookup : Bool
   input_actions : Bool
   screenshot : Bool
-} derive(Show, Eq)
+} derive(Eq)
 
 ///|
 /// Backend contract for protocol behavior
@@ -74,7 +74,7 @@ pub struct InMemoryBackend {
 pub fn InMemoryBackend::new(
   initial_contexts? : Array[String],
 ) -> InMemoryBackend {
-  let contexts : Map[String, String] = {}
+  let contexts : Map[String, String] = Map([])
   let context_ids = match initial_contexts {
     Some(values) => values
     None => ["ctx-1"]
@@ -82,7 +82,7 @@ pub fn InMemoryBackend::new(
   for context_id in context_ids {
     contexts[context_id] = "about:blank"
   }
-  { state: Ref::new({ next_navigation_id: 1, contexts, action_log: [] }) }
+  { state: Ref({ next_navigation_id: 1, contexts, action_log: [], }), }
 }
 
 ///|
@@ -99,20 +99,20 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     if url.is_empty() {
       return Err(InvalidArgument(message="url must not be empty"))
     }
-    if !(self.state.val.contexts.contains(context_id)) {
+    if !self.state.val.contexts.contains(context_id) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     let nav_id = self.state.val.next_navigation_id
     self.state.val.next_navigation_id = nav_id + 1
     self.state.val.contexts[context_id] = url
-    Ok({ navigation: "nav-" + nav_id.to_string(), url })
+    Ok({ navigation: "nav-" + nav_id.to_string(), url, })
   }
   let evaluate = fn(
     context_id : String,
     expression : String,
     _await_promise : Bool,
   ) -> Result[Json, BackendError] {
-    if !(self.state.val.contexts.contains(context_id)) {
+    if !self.state.val.contexts.contains(context_id) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     if expression == "1 + 1" {
@@ -143,7 +143,7 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     locator : Json,
     max_node_count : Int?,
   ) -> Result[Array[NodeReference], BackendError] {
-    if !(self.state.val.contexts.contains(context_id)) {
+    if !self.state.val.contexts.contains(context_id) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     let node_count = match max_node_count {
@@ -176,7 +176,7 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     }
     let nodes : Array[NodeReference] = []
     for i in 0..<node_count {
-      nodes.push({ handle: None, shared_id: Some("node-" + i.to_string()) })
+      nodes.push({ handle: None, shared_id: Some("node-" + i.to_string()), })
     }
     Ok(nodes)
   }
@@ -208,7 +208,7 @@ pub fn InMemoryBackend::to_backend(self : InMemoryBackend) -> Backend {
     context_id : String,
     _format : String?,
   ) -> Result[String, BackendError] {
-    if !(self.state.val.contexts.contains(context_id)) {
+    if !self.state.val.contexts.contains(context_id) {
       return Err(NotFound(message="context not found: " + context_id))
     }
     Ok("mock-screenshot:" + context_id)

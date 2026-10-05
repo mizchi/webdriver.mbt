@@ -7,7 +7,7 @@ pub struct BidiRequest {
   id : Int
   method_name : String
   params : Json?
-} derive(Show)
+}
 
 ///|
 /// BiDi response message
@@ -15,7 +15,7 @@ pub struct BidiResponse {
   id : Int
   result : Json?
   error : BidiError?
-} derive(Show)
+}
 
 ///|
 /// BiDi error payload
@@ -23,21 +23,21 @@ pub struct BidiError {
   error : String
   message : String
   stacktrace : String
-} derive(Show)
+}
 
 ///|
 /// BiDi event message
 pub struct BidiEvent {
   event_method : String
   params : Json
-} derive(Show)
+}
 
 ///|
 /// Incoming BiDi message
 pub enum BidiIncoming {
   Response(BidiResponse)
   Event(BidiEvent)
-} derive(Show)
+}
 
 ///|
 /// Transport error
@@ -45,7 +45,7 @@ pub enum TransportError {
   NotSupported(message~ : String)
   NetworkError(message~ : String)
   Closed
-} derive(Show)
+}
 
 ///|
 /// Client error
@@ -54,42 +54,42 @@ pub enum ClientError {
   ParseError(message~ : String)
   InvalidArgument(message~ : String)
   ResponseError(error~ : BidiError)
-} derive(Show)
+}
 
 ///|
 /// session.status result
 pub struct SessionStatus {
   ready : Bool
   message : String?
-} derive(Show)
+}
 
 ///|
 /// session.new result
 pub struct SessionInfo {
   session_id : String
   capabilities : Json?
-} derive(Show)
+}
 
 ///|
 /// browsingContext.navigate result
 pub struct NavigationResult {
   navigation : String
   url : String
-} derive(Show)
+}
 
 ///|
 /// browsingContext.locateNodes node reference
 pub struct NodeReference {
   handle : String?
   shared_id : String?
-} derive(Show)
+}
 
 ///|
 /// Result ownership for script.evaluate / callFunction
 pub enum ResultOwnership {
   NoneOwnership
   Root
-} derive(Show, Eq)
+} derive(Eq)
 
 ///|
 pub fn ResultOwnership::to_string(self : ResultOwnership) -> String {
@@ -115,7 +115,7 @@ pub struct SerializationOptions {
   max_depth : Int?
   max_object_depth : Int?
   include_shadow_tree : String?
-} derive(Show)
+}
 
 ///|
 pub fn SerializationOptions::new(
@@ -123,12 +123,12 @@ pub fn SerializationOptions::new(
   max_object_depth? : Int,
   include_shadow_tree? : String,
 ) -> SerializationOptions {
-  { max_depth, max_object_depth, include_shadow_tree }
+  { max_depth, max_object_depth, include_shadow_tree, }
 }
 
 ///|
 pub fn SerializationOptions::to_json(self : SerializationOptions) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   match self.max_depth {
     Some(n) => obj["maxDepth"] = Json::number(n.to_double())
     None => ()
@@ -149,7 +149,7 @@ pub fn SerializationOptions::to_json(self : SerializationOptions) -> Json {
 pub enum InnerTextMatchType {
   Full
   Partial
-} derive(Show, Eq)
+} derive(Eq)
 
 ///|
 pub fn InnerTextMatchType::to_string(self : InnerTextMatchType) -> String {
@@ -175,7 +175,7 @@ pub struct InnerTextLocator {
   text : String
   match_type : InnerTextMatchType
   ignore_case : Bool
-} derive(Show)
+}
 
 ///|
 /// Accessibility locator value
@@ -183,7 +183,7 @@ pub struct AccessibilityLocator {
   role : String
   name : String?
   exact : Bool?
-} derive(Show)
+}
 
 ///|
 /// Locator for browsingContext.locateNodes
@@ -193,7 +193,7 @@ pub enum Locator {
   InnerText(InnerTextLocator)
   Accessibility(AccessibilityLocator)
   Custom(type_name~ : String, value~ : Json)
-} derive(Show)
+}
 
 ///|
 pub fn Locator::css(selector : String) -> Locator {
@@ -211,7 +211,7 @@ pub fn Locator::inner_text(
   match_type? : InnerTextMatchType = Partial,
   ignore_case? : Bool = false,
 ) -> Locator {
-  InnerText({ text, match_type, ignore_case })
+  InnerText({ text, match_type, ignore_case, })
 }
 
 ///|
@@ -220,7 +220,7 @@ pub fn Locator::accessibility(
   name? : String,
   exact? : Bool = false,
 ) -> Locator {
-  Accessibility({ role, name, exact: Some(exact) })
+  Accessibility({ role, name, exact: Some(exact), })
 }
 
 ///|
@@ -230,7 +230,7 @@ pub fn Locator::custom(type_name : String, value : Json) -> Locator {
 
 ///|
 pub fn Locator::to_json(self : Locator) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   match self {
     Css(selector) => {
       obj["type"] = Json::string("css")
@@ -242,7 +242,7 @@ pub fn Locator::to_json(self : Locator) -> Json {
     }
     InnerText(locator) => {
       obj["type"] = Json::string("innerText")
-      let value : Map[String, Json] = {}
+      let value : Map[String, Json] = Map([])
       value["value"] = Json::string(locator.text)
       value["matchType"] = Json::string(locator.match_type.to_string())
       value["ignoreCase"] = Json::boolean(locator.ignore_case)
@@ -250,7 +250,7 @@ pub fn Locator::to_json(self : Locator) -> Json {
     }
     Accessibility(locator) => {
       obj["type"] = Json::string("accessibility")
-      let value : Map[String, Json] = {}
+      let value : Map[String, Json] = Map([])
       value["role"] = Json::string(locator.role)
       match locator.name {
         Some(n) => value["name"] = Json::string(n)
@@ -276,7 +276,7 @@ pub enum PointerType {
   Mouse
   Pen
   Touch
-} derive(Show, Eq)
+} derive(Eq)
 
 ///|
 pub fn PointerType::to_string(self : PointerType) -> String {
@@ -309,7 +309,7 @@ pub enum ActionOrigin {
   Pointer
   ElementHandle(handle~ : String)
   ElementSharedId(shared_id~ : String)
-} derive(Show)
+}
 
 ///|
 pub fn ActionOrigin::to_json(self : ActionOrigin) -> Json {
@@ -364,7 +364,7 @@ pub enum InputAction {
   PointerCancel
   KeyDown(value~ : String)
   KeyUp(value~ : String)
-} derive(Show)
+}
 
 ///|
 pub fn InputAction::pause(duration? : Int) -> InputAction {
@@ -408,7 +408,7 @@ pub fn InputAction::key_up(value : String) -> InputAction {
 
 ///|
 pub fn InputAction::to_json(self : InputAction) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   match self {
     Pause(duration~) => {
       obj["type"] = Json::string("pause")
@@ -454,7 +454,7 @@ pub enum InputSourceType {
   Pointer
   Key
   NoneSource
-} derive(Show, Eq)
+} derive(Eq)
 
 ///|
 pub fn InputSourceType::to_string(self : InputSourceType) -> String {
@@ -469,7 +469,7 @@ pub fn InputSourceType::to_string(self : InputSourceType) -> String {
 /// Pointer parameters
 pub struct PointerParameters {
   pointer_type : PointerType
-} derive(Show)
+}
 
 ///|
 pub fn PointerParameters::to_json(self : PointerParameters) -> Json {
@@ -483,7 +483,7 @@ pub struct ActionSequence {
   source_type : InputSourceType
   actions : Array[InputAction]
   parameters : PointerParameters?
-} derive(Show)
+}
 
 ///|
 pub fn ActionSequence::pointer(
@@ -491,7 +491,7 @@ pub fn ActionSequence::pointer(
   pointer_type : PointerType,
   actions : Array[InputAction],
 ) -> ActionSequence {
-  { id, source_type: Pointer, actions, parameters: Some({ pointer_type, }) }
+  { id, source_type: Pointer, actions, parameters: Some({ pointer_type, }), }
 }
 
 ///|
@@ -499,7 +499,7 @@ pub fn ActionSequence::key(
   id : String,
   actions : Array[InputAction],
 ) -> ActionSequence {
-  { id, source_type: Key, actions, parameters: None }
+  { id, source_type: Key, actions, parameters: None, }
 }
 
 ///|
@@ -507,12 +507,12 @@ pub fn ActionSequence::none(
   id : String,
   actions : Array[InputAction],
 ) -> ActionSequence {
-  { id, source_type: NoneSource, actions, parameters: None }
+  { id, source_type: NoneSource, actions, parameters: None, }
 }
 
 ///|
 pub fn ActionSequence::to_json(self : ActionSequence) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["type"] = Json::string(self.source_type.to_string())
   obj["id"] = Json::string(self.id)
   let actions_json : Array[Json] = []
@@ -531,7 +531,7 @@ pub fn ActionSequence::to_json(self : ActionSequence) -> Json {
 /// Remote value for script arguments
 pub struct RemoteValue {
   json : Json
-} derive(Show)
+}
 
 ///|
 pub fn RemoteValue::to_json(self : RemoteValue) -> Json {
@@ -540,12 +540,12 @@ pub fn RemoteValue::to_json(self : RemoteValue) -> Json {
 
 ///|
 pub fn RemoteValue::undefined() -> RemoteValue {
-  { json: Json::object({ "type": Json::string("undefined") }) }
+  { json: Json::object({ "type": Json::string("undefined") }), }
 }
 
 ///|
 pub fn RemoteValue::null() -> RemoteValue {
-  { json: Json::object({ "type": Json::string("null") }) }
+  { json: Json::object({ "type": Json::string("null") }), }
 }
 
 ///|
@@ -602,7 +602,7 @@ pub fn RemoteValue::shared_id(shared_id : String) -> RemoteValue {
 /// Network cache behavior wrapper
 pub struct CacheBehavior {
   value : String
-} derive(Show)
+}
 
 ///|
 pub fn CacheBehavior::new(value : String) -> CacheBehavior {
@@ -611,12 +611,12 @@ pub fn CacheBehavior::new(value : String) -> CacheBehavior {
 
 ///|
 pub fn CacheBehavior::default() -> CacheBehavior {
-  { value: "default" }
+  { value: "default", }
 }
 
 ///|
 pub fn CacheBehavior::bypass() -> CacheBehavior {
-  { value: "bypass" }
+  { value: "bypass", }
 }
 
 ///|
@@ -629,19 +629,19 @@ pub fn CacheBehavior::to_string(self : CacheBehavior) -> String {
 pub struct NetworkDataCollector {
   data_types : Array[String]
   contexts : Array[String]?
-} derive(Show)
+}
 
 ///|
 pub fn NetworkDataCollector::new(
   data_types : Array[String],
   contexts? : Array[String],
 ) -> NetworkDataCollector {
-  { data_types, contexts }
+  { data_types, contexts, }
 }
 
 ///|
 pub fn NetworkDataCollector::to_json(self : NetworkDataCollector) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   let data_types : Array[Json] = []
   for item in self.data_types {
     data_types.push(Json::string(item))

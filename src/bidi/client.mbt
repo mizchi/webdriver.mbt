@@ -205,7 +205,7 @@ pub async fn BidiClient::send(
   }
   let id = self.next_id
   self.next_id = self.next_id + 1
-  let request : BidiRequest = { id, method_name, params }
+  let request : BidiRequest = { id, method_name, params, }
   match self.transport.send(request.to_json()) {
     Ok(_) => ()
     Err(e) => return Err(Transport(e))
@@ -233,7 +233,7 @@ pub async fn BidiClient::dispatch(
   command : String,
   params? : Json? = None,
 ) -> Result[Json, ClientError] {
-  if !(is_supported_domain_command(domain, command)) {
+  if !is_supported_domain_command(domain, command) {
     return Err(unknown_command_error(domain, command))
   }
   self.send(domain + "." + command, params~)
@@ -250,7 +250,7 @@ pub async fn BidiClient::session_status(
       match get_bool_field(json, "ready") {
         Some(ready) => {
           let message = get_string_field(json, "message")
-          Ok({ ready, message })
+          Ok({ ready, message, })
         }
         None => Err(ParseError(message="Missing ready field"))
       }
@@ -277,7 +277,7 @@ pub async fn BidiClient::session_new(
   }
   let result = match capabilities {
     Some(caps) => {
-      let params : Map[String, Json] = {}
+      let params : Map[String, Json] = Map([])
       params["capabilities"] = caps
       self.dispatch("session", "new", params=Some(Json::object(params)))
     }
@@ -288,7 +288,7 @@ pub async fn BidiClient::session_new(
       match get_string_field(json, "sessionId") {
         Some(session_id) => {
           let caps = get_object_field(json, "capabilities")
-          Ok({ session_id, capabilities: caps })
+          Ok({ session_id, capabilities: caps, })
         }
         None => Err(ParseError(message="Missing sessionId field"))
       }
@@ -311,7 +311,7 @@ pub async fn BidiClient::session_subscribe(
   for e in events {
     json_events.push(Json::string(e))
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["events"] = Json::array(json_events)
   match contexts {
     Some(context_ids) => {
@@ -348,7 +348,7 @@ pub async fn BidiClient::session_unsubscribe(
   for e in events {
     json_events.push(Json::string(e))
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["events"] = Json::array(json_events)
   match contexts {
     Some(context_ids) => {
@@ -432,7 +432,7 @@ pub async fn BidiClient::browser_remove_user_context(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["userContext"] = Json::string(user_context)
   match
     self.dispatch(
@@ -474,7 +474,7 @@ pub async fn BidiClient::browsing_context_create(
       }
     None => ()
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["type"] = Json::string(context_type)
   match user_context {
     Some(u) => params["userContext"] = Json::string(u)
@@ -505,7 +505,7 @@ pub async fn BidiClient::browsing_context_reload(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["context"] = Json::string(context_id)
   match
     self.dispatch(
@@ -528,7 +528,7 @@ pub async fn BidiClient::browsing_context_close(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["context"] = Json::string(context_id)
   match
     self.dispatch("browsingContext", "close", params=Some(Json::object(params))) {
@@ -544,7 +544,7 @@ pub async fn BidiClient::browsing_context_get_tree(
   root? : String,
   max_depth? : Int,
 ) -> Result[Json, ClientError] {
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   let mut has_params = false
   match root {
     Some(value) =>
@@ -593,12 +593,12 @@ pub async fn BidiClient::browsing_context_navigate(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  if !(is_valid_navigation_wait(wait)) {
+  if !is_valid_navigation_wait(wait) {
     return Err(
       invalid_argument_error("wait must be one of none|interactive|complete"),
     )
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["context"] = Json::string(context_id)
   params["url"] = Json::string(url)
   params["wait"] = Json::string(wait)
@@ -612,7 +612,7 @@ pub async fn BidiClient::browsing_context_navigate(
       let navigation = get_string_field(json, "navigation")
       let result_url = get_string_field(json, "url")
       match (navigation, result_url) {
-        (Some(nav), Some(u)) => Ok({ navigation: nav, url: u })
+        (Some(nav), Some(u)) => Ok({ navigation: nav, url: u, })
         _ => Err(ParseError(message="Missing navigation/url field"))
       }
     }
@@ -634,7 +634,7 @@ pub async fn BidiClient::browsing_context_capture_screenshot(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["context"] = Json::string(context_id)
   match origin {
     Some(value) =>
@@ -649,7 +649,7 @@ pub async fn BidiClient::browsing_context_capture_screenshot(
   }
   match format {
     Some(value) =>
-      if !(is_supported_screenshot_format(value)) {
+      if !is_supported_screenshot_format(value) {
         return Err(
           invalid_argument_error(
             "format must be one of image/png|image/jpeg|png|jpeg",
@@ -756,7 +756,7 @@ async fn BidiClient::locate_nodes_impl(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["context"] = Json::string(context_id)
   params["locator"] = locator
   match max_node_count {
@@ -802,7 +802,7 @@ fn parse_node_references(
         ParseError(message="Node reference must include handle or sharedId"),
       )
     }
-    references.push({ handle, shared_id })
+    references.push({ handle, shared_id, })
   }
   Ok(references)
 }
@@ -826,7 +826,7 @@ pub async fn BidiClient::script_evaluate(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["expression"] = Json::string(expression)
   params["target"] = Json::object({ "context": Json::string(context_id) })
   params["awaitPromise"] = Json::boolean(await_promise)
@@ -916,7 +916,7 @@ async fn BidiClient::call_function_impl(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["functionDeclaration"] = Json::string(function_declaration)
   params["target"] = Json::object({ "context": Json::string(context_id) })
   params["arguments"] = Json::array(arguments)
@@ -963,7 +963,7 @@ pub async fn BidiClient::script_add_preload_script(
   for arg in arguments {
     args_json.push(arg.to_json())
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["functionDeclaration"] = Json::string(function_declaration)
   params["arguments"] = Json::array(args_json)
   match contexts {
@@ -1028,7 +1028,7 @@ pub async fn BidiClient::script_remove_preload_script(
     Ok(_) => ()
     Err(e) => return Err(e)
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["script"] = Json::string(script_id)
   match
     self.dispatch(
@@ -1052,7 +1052,7 @@ pub async fn BidiClient::script_disown(
   if handles.length() == 0 {
     return Err(invalid_argument_error("handles must not be empty"))
   }
-  let target : Map[String, Json] = {}
+  let target : Map[String, Json] = Map([])
   match context_id {
     Some(value) =>
       if value.is_empty() {
@@ -1080,7 +1080,7 @@ pub async fn BidiClient::script_disown(
     }
     handle_values.push(Json::string(handle))
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["handles"] = Json::array(handle_values)
   params["target"] = Json::object(target)
   match self.dispatch("script", "disown", params=Some(Json::object(params))) {
@@ -1099,7 +1099,7 @@ pub async fn BidiClient::input_perform_actions(
   if actions.length() == 0 {
     return Err(invalid_argument_error("actions must not be empty"))
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["actions"] = Json::array(actions)
   match context_id {
     Some(ctx) =>
@@ -1140,7 +1140,7 @@ pub async fn BidiClient::input_release_actions(
   self : BidiClient,
   context_id? : String,
 ) -> Result[Unit, ClientError] {
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   match context_id {
     Some(ctx) =>
       if ctx.is_empty() {
@@ -1164,12 +1164,12 @@ pub async fn BidiClient::network_set_cache_behavior(
   cache_behavior : String,
   contexts? : Array[String],
 ) -> Result[Unit, ClientError] {
-  if !(is_supported_cache_behavior(cache_behavior)) {
+  if !is_supported_cache_behavior(cache_behavior) {
     return Err(
       invalid_argument_error("cacheBehavior must be one of default|bypass"),
     )
   }
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["cacheBehavior"] = Json::string(cache_behavior)
   match contexts {
     Some(items) => {
@@ -1231,7 +1231,7 @@ pub async fn BidiClient::network_add_data_collector_typed(
     return Err(invalid_argument_error("dataTypes must not be empty"))
   }
   for data_type in collector.data_types {
-    if !(is_supported_data_type(data_type)) {
+    if !is_supported_data_type(data_type) {
       return Err(invalid_argument_error("Invalid data type: " + data_type))
     }
   }
@@ -1293,7 +1293,7 @@ async fn BidiClient::wait_response(
 ///|
 /// Dispatch event to handlers
 fn BidiClient::dispatch_event(self : BidiClient, evt : BidiEvent) -> Unit {
-  if !(self.is_event_subscribed(evt)) {
+  if !self.is_event_subscribed(evt) {
     return ()
   }
   for handler in self.event_handlers {
@@ -1303,7 +1303,7 @@ fn BidiClient::dispatch_event(self : BidiClient, evt : BidiEvent) -> Unit {
 
 ///|
 fn BidiClient::is_event_subscribed(self : BidiClient, evt : BidiEvent) -> Bool {
-  if !(self.has_subscription_filter) {
+  if !self.has_subscription_filter {
     return true
   }
   if self.global_subscriptions.contains(evt.event_method) {
@@ -1332,7 +1332,7 @@ fn BidiClient::apply_subscribe(
         let context_events = match self.context_subscriptions.get(context_id) {
           Some(existing) => existing
           None => {
-            let created : Map[String, Bool] = {}
+            let created : Map[String, Bool] = Map([])
             self.context_subscriptions[context_id] = created
             created
           }
@@ -1511,7 +1511,7 @@ fn validate_subscription_request(
     return Err(invalid_argument_error("events must not be empty"))
   }
   for event_name in events {
-    if !(is_supported_event_name(event_name)) {
+    if !is_supported_event_name(event_name) {
       return Err(invalid_argument_error("Invalid event name: " + event_name))
     }
   }

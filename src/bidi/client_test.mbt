@@ -5,13 +5,13 @@
 fn make_mock_transport(
   sent : Ref[Array[String]],
   recv_queue : Ref[Array[String]],
-) -> Transport {
-  let connect = fn() -> Result[Unit, TransportError] { Ok(()) }
-  let send = fn(message : String) -> Result[Unit, TransportError] {
+) -> @bidi.Transport {
+  let connect = fn() -> Result[Unit, @bidi.TransportError] { Ok(()) }
+  let send = fn(message : String) -> Result[Unit, @bidi.TransportError] {
     sent.val.push(message)
     Ok(())
   }
-  let recv = fn() -> Result[String, TransportError] {
+  let recv = fn() -> Result[String, @bidi.TransportError] {
     if recv_queue.val.length() == 0 {
       Ok("{\"id\":0,\"type\":\"success\",\"result\":{}}")
     } else {
@@ -19,8 +19,10 @@ fn make_mock_transport(
       Ok(head)
     }
   }
-  let close = fn() -> Result[Unit, TransportError] { Ok(()) }
-  Transport::custom(CustomTransport::new(connect, send, recv, close))
+  let close = fn() -> Result[Unit, @bidi.TransportError] { Ok(()) }
+  @bidi.Transport::custom(
+    @bidi.CustomTransport::new(connect, send, recv, close),
+  )
 }
 
 ///|
@@ -86,91 +88,96 @@ fn test_get_array_field(json : Json, key : String) -> Array[Json]? {
 
 ///|
 async test "session.status returns parsed result" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"id\":1,\"type\":\"success\",\"result\":{\"ready\":true,\"message\":\"ok\"}}",
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let status = client.session_status()
   match status {
     Ok(s) => {
       assert_true(s.ready)
-      inspect(s.message, content="Some(\"ok\")")
+      @debug.debug_inspect(s.message, content="Some(\"ok\")")
     }
     Err(_) => assert_true(false)
   }
   let req_json = @json.parse(sent.val[0]) catch { _ => Json::null() }
-  inspect(
+  @debug.debug_inspect(
     test_get_string_field(req_json, "method"),
     content="Some(\"session.status\")",
   )
-  inspect(test_get_int_field(req_json, "id"), content="Some(1)")
+  @debug.debug_inspect(test_get_int_field(req_json, "id"), content="Some(1)")
 }
 
 ///|
 async test "event is dispatched while waiting for response" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"type\":\"event\",\"method\":\"log.entryAdded\",\"params\":{}}", "{\"id\":1,\"type\":\"success\",\"result\":{}}",
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
-  let captured : Ref[String?] = { val: None }
-  client.on_event(fn(evt : BidiEvent) { captured.val = Some(evt.event_method) })
+  let client = @bidi.BidiClient::new(transport)
+  let captured : Ref[String?] = { val: None, }
+  client.on_event(fn(evt : @bidi.BidiEvent) {
+    captured.val = Some(evt.event_method)
+  })
   let _ = client.send("session.status")
-  inspect(captured.val, content="Some(\"log.entryAdded\")")
+  @debug.debug_inspect(captured.val, content="Some(\"log.entryAdded\")")
 }
 
 ///|
 async test "browsingContext.create builds params" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: ["{\"id\":1,\"type\":\"success\",\"result\":{\"context\":\"ctx-1\"}}"],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let result = client.browsing_context_create("tab")
-  inspect(result, content="Ok(\"ctx-1\")")
+  assert_true(result is Ok("ctx-1"))
   let req_json = @json.parse(sent.val[0]) catch { _ => Json::null() }
   let params = test_get_object_field(req_json, "params").unwrap_or(
     Json::object({}),
   )
-  inspect(test_get_string_field(params, "type"), content="Some(\"tab\")")
+  @debug.debug_inspect(
+    test_get_string_field(params, "type"),
+    content="Some(\"tab\")",
+  )
 }
 
 ///|
 async test "request id increments" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"id\":1,\"type\":\"success\",\"result\":{\"ready\":true}}", "{\"id\":2,\"type\":\"success\",\"result\":{}}",
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let _ = client.session_status()
   let _ = client.session_subscribe(["browsingContext.load"])
   let req0 = @json.parse(sent.val[0]) catch { _ => Json::null() }
   let req1 = @json.parse(sent.val[1]) catch { _ => Json::null() }
-  inspect(test_get_int_field(req0, "id"), content="Some(1)")
-  inspect(test_get_int_field(req1, "id"), content="Some(2)")
+  @debug.debug_inspect(test_get_int_field(req0, "id"), content="Some(1)")
+  @debug.debug_inspect(test_get_int_field(req1, "id"), content="Some(2)")
 }
 
 ///|
 async test "session.new parses sessionId" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"id\":1,\"type\":\"success\",\"result\":{\"sessionId\":\"sid-1\",\"capabilities\":{}}}",
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let result = client.session_new()
   match result {
     Ok(info) => {
@@ -183,7 +190,7 @@ async test "session.new parses sessionId" {
     Err(_) => assert_true(false)
   }
   let req_json = @json.parse(sent.val[0]) catch { _ => Json::null() }
-  inspect(
+  @debug.debug_inspect(
     test_get_string_field(req_json, "method"),
     content="Some(\"session.new\")",
   )
@@ -191,12 +198,12 @@ async test "session.new parses sessionId" {
 
 ///|
 async test "session.unsubscribe builds params" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: ["{\"id\":1,\"type\":\"success\",\"result\":{}}"],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let _ = client.session_unsubscribe(["browsingContext.load"])
   let req_json = @json.parse(sent.val[0]) catch { _ => Json::null() }
   let params = test_get_object_field(req_json, "params").unwrap_or(
@@ -211,28 +218,31 @@ async test "session.unsubscribe builds params" {
 
 ///|
 async test "browsingContext.reload builds params" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: ["{\"id\":1,\"type\":\"success\",\"result\":{}}"],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let _ = client.browsing_context_reload("ctx-1")
   let req_json = @json.parse(sent.val[0]) catch { _ => Json::null() }
   let params = test_get_object_field(req_json, "params").unwrap_or(
     Json::object({}),
   )
-  inspect(test_get_string_field(params, "context"), content="Some(\"ctx-1\")")
+  @debug.debug_inspect(
+    test_get_string_field(params, "context"),
+    content="Some(\"ctx-1\")",
+  )
 }
 
 ///|
 async test "input.performActions builds params" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: ["{\"id\":1,\"type\":\"success\",\"result\":{}}"],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let actions : Array[Json] = [Json::object({ "type": Json::string("key") })]
   let _ = client.input_perform_actions(actions, context_id="ctx-1")
   let req_json = @json.parse(sent.val[0]) catch { _ => Json::null() }
@@ -244,19 +254,22 @@ async test "input.performActions builds params" {
     None => []
   }
   inspect(actions_json.length(), content="1")
-  inspect(test_get_string_field(params, "context"), content="Some(\"ctx-1\")")
+  @debug.debug_inspect(
+    test_get_string_field(params, "context"),
+    content="Some(\"ctx-1\")",
+  )
 }
 
 ///|
 async test "browser.getUserContexts parses list" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"id\":1,\"type\":\"success\",\"result\":{\"userContexts\":[{\"userContext\":\"default\"},{\"userContext\":\"user-1\"}]}}",
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let result = client.browser_get_user_contexts()
   match result {
     Ok(contexts) => {
@@ -269,12 +282,12 @@ async test "browser.getUserContexts parses list" {
 
 ///|
 async test "network.setCacheBehavior builds params" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: ["{\"id\":1,\"type\":\"success\",\"result\":{}}"],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let _ = client.network_set_cache_behavior("default", contexts=[
     "ctx-1", "ctx-2",
   ])
@@ -282,7 +295,7 @@ async test "network.setCacheBehavior builds params" {
   let params = test_get_object_field(req_json, "params").unwrap_or(
     Json::object({}),
   )
-  inspect(
+  @debug.debug_inspect(
     test_get_string_field(params, "cacheBehavior"),
     content="Some(\"default\")",
   )
@@ -295,7 +308,7 @@ async test "network.setCacheBehavior builds params" {
 
 ///|
 async test "network event hook filters by method prefix" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"type\":\"event\",\"method\":\"network.responseCompleted\",\"params\":{}}",
@@ -303,18 +316,21 @@ async test "network event hook filters by method prefix" {
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
-  let captured : Ref[String?] = { val: None }
-  client.on_network_event(fn(evt : BidiEvent) {
+  let client = @bidi.BidiClient::new(transport)
+  let captured : Ref[String?] = { val: None, }
+  client.on_network_event(fn(evt : @bidi.BidiEvent) {
     captured.val = Some(evt.event_method)
   })
   let _ = client.send("session.status")
-  inspect(captured.val, content="Some(\"network.responseCompleted\")")
+  @debug.debug_inspect(
+    captured.val,
+    content="Some(\"network.responseCompleted\")",
+  )
 }
 
 ///|
 async test "log.entryAdded hook supports level filter" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"type\":\"event\",\"method\":\"log.entryAdded\",\"params\":{\"level\":\"info\"}}",
@@ -322,12 +338,12 @@ async test "log.entryAdded hook supports level filter" {
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
-  let captured : Ref[Int] = { val: 0 }
-  client.on_log_entry_added(level="error", fn(_evt : BidiEvent) {
+  let client = @bidi.BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0, }
+  client.on_log_entry_added(level="error", fn(_evt : @bidi.BidiEvent) {
     captured.val = captured.val + 1
   })
-  client.on_log_entry_added(level="info", fn(_evt : BidiEvent) {
+  client.on_log_entry_added(level="info", fn(_evt : @bidi.BidiEvent) {
     captured.val = captured.val + 1
   })
   let _ = client.send("session.status")
@@ -336,20 +352,26 @@ async test "log.entryAdded hook supports level filter" {
 
 ///|
 async test "central dispatch sends session.status" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"id\":1,\"type\":\"success\",\"result\":{\"ready\":true,\"message\":\"ok\"}}",
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let result = client.dispatch("session", "status")
   match result {
     Ok(json) => {
-      inspect(test_get_bool_field(json, "ready"), content="Some(true)")
-      inspect(test_get_string_field(json, "message"), content="Some(\"ok\")")
-      inspect(
+      @debug.debug_inspect(
+        test_get_bool_field(json, "ready"),
+        content="Some(true)",
+      )
+      @debug.debug_inspect(
+        test_get_string_field(json, "message"),
+        content="Some(\"ok\")",
+      )
+      @debug.debug_inspect(
         test_get_int_field(
           @json.parse(sent.val[0]) catch {
             _ => Json::null()
@@ -358,7 +380,7 @@ async test "central dispatch sends session.status" {
         ),
         content="Some(1)",
       )
-      inspect(
+      @debug.debug_inspect(
         test_get_string_field(
           @json.parse(sent.val[0]) catch {
             _ => Json::null()
@@ -374,10 +396,10 @@ async test "central dispatch sends session.status" {
 
 ///|
 async test "central dispatch rejects unsupported domain command" {
-  let sent : Ref[Array[String]] = { val: [] }
-  let recv_queue : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
+  let recv_queue : Ref[Array[String]] = { val: [], }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let result = client.dispatch("session", "unknown")
   match result {
     Err(InvalidArgument(message~)) =>
@@ -389,7 +411,7 @@ async test "central dispatch rejects unsupported domain command" {
 
 ///|
 async test "browsingContext domain hook receives browsingContext event only" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"type\":\"event\",\"method\":\"browsingContext.load\",\"params\":{}}", "{\"type\":\"event\",\"method\":\"network.responseCompleted\",\"params\":{}}",
@@ -397,9 +419,9 @@ async test "browsingContext domain hook receives browsingContext event only" {
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
-  let captured : Ref[Int] = { val: 0 }
-  client.on_browsing_context_event(fn(_evt : BidiEvent) {
+  let client = @bidi.BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0, }
+  client.on_browsing_context_event(fn(_evt : @bidi.BidiEvent) {
     captured.val = captured.val + 1
   })
   let _ = client.send("session.status")
@@ -408,7 +430,7 @@ async test "browsingContext domain hook receives browsingContext event only" {
 
 ///|
 async test "session.subscribe supports contexts and filters events per context" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"id\":1,\"type\":\"success\",\"result\":{}}", "{\"type\":\"event\",\"method\":\"browsingContext.load\",\"params\":{\"context\":\"ctx-1\"}}",
@@ -417,9 +439,9 @@ async test "session.subscribe supports contexts and filters events per context" 
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
-  let captured : Ref[Int] = { val: 0 }
-  client.on_event(fn(_evt : BidiEvent) { captured.val = captured.val + 1 })
+  let client = @bidi.BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0, }
+  client.on_event(fn(_evt : @bidi.BidiEvent) { captured.val = captured.val + 1 })
   let subscribe = client.session_subscribe(["browsingContext.load"], contexts=[
     "ctx-1",
   ])
@@ -439,7 +461,7 @@ async test "session.subscribe supports contexts and filters events per context" 
 
 ///|
 async test "session.unsubscribe removes context subscription" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"id\":1,\"type\":\"success\",\"result\":{}}", "{\"id\":2,\"type\":\"success\",\"result\":{}}",
@@ -448,9 +470,9 @@ async test "session.unsubscribe removes context subscription" {
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
-  let captured : Ref[Int] = { val: 0 }
-  client.on_event(fn(_evt : BidiEvent) { captured.val = captured.val + 1 })
+  let client = @bidi.BidiClient::new(transport)
+  let captured : Ref[Int] = { val: 0, }
+  client.on_event(fn(_evt : @bidi.BidiEvent) { captured.val = captured.val + 1 })
   let _ = client.session_subscribe(["browsingContext.load"], contexts=["ctx-1"])
   let _ = client.session_unsubscribe(["browsingContext.load"], contexts=[
     "ctx-1",
@@ -461,7 +483,7 @@ async test "session.unsubscribe removes context subscription" {
 
 ///|
 async test "event order is preserved while waiting for response" {
-  let sent : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
   let recv_queue : Ref[Array[String]] = {
     val: [
       "{\"type\":\"event\",\"method\":\"network.responseStarted\",\"params\":{}}",
@@ -470,9 +492,11 @@ async test "event order is preserved while waiting for response" {
     ],
   }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
-  let captured : Ref[Array[String]] = { val: [] }
-  client.on_event(fn(evt : BidiEvent) { captured.val.push(evt.event_method) })
+  let client = @bidi.BidiClient::new(transport)
+  let captured : Ref[Array[String]] = { val: [], }
+  client.on_event(fn(evt : @bidi.BidiEvent) {
+    captured.val.push(evt.event_method)
+  })
   let _ = client.send("session.status")
   assert_eq(captured.val.length(), 2)
   assert_eq(captured.val[0], "network.responseStarted")
@@ -481,10 +505,10 @@ async test "event order is preserved while waiting for response" {
 
 ///|
 async test "session.subscribe validates event names and contexts" {
-  let sent : Ref[Array[String]] = { val: [] }
-  let recv_queue : Ref[Array[String]] = { val: [] }
+  let sent : Ref[Array[String]] = { val: [], }
+  let recv_queue : Ref[Array[String]] = { val: [], }
   let transport = make_mock_transport(sent, recv_queue)
-  let client = BidiClient::new(transport)
+  let client = @bidi.BidiClient::new(transport)
   let invalid_event = client.session_subscribe(["invalid"])
   match invalid_event {
     Err(InvalidArgument(message~)) =>

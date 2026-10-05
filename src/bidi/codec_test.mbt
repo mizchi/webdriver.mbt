@@ -4,7 +4,7 @@
 ///|
 test "parse_request parses command request" {
   match
-    parse_request(
+    @bidi.parse_request(
       "{\"id\":7,\"method\":\"session.status\",\"params\":{\"ready\":true}}",
     ) {
     Ok(request) => {
@@ -25,11 +25,11 @@ test "parse_request parses command request" {
 
 ///|
 test "parse_request rejects invalid command request" {
-  match parse_request("{\"id\":1.5,\"method\":\"session.status\"}") {
+  match @bidi.parse_request("{\"id\":1.5,\"method\":\"session.status\"}") {
     Err(message) => inspect(message, content="Invalid id field")
     _ => fail("expected invalid id error")
   }
-  match parse_request("{\"id\":1}") {
+  match @bidi.parse_request("{\"id\":1}") {
     Err(message) => inspect(message, content="Missing method field")
     _ => fail("expected missing method error")
   }
@@ -37,22 +37,22 @@ test "parse_request rejects invalid command request" {
 
 ///|
 test "codec serializes success error and event envelopes" {
-  let result : Map[String, Json] = {}
+  let result : Map[String, Json] = Map([])
   result["ready"] = Json::boolean(true)
-  let success = success_response_to_json(1, Some(Json::object(result)))
+  let success = @bidi.success_response_to_json(1, Some(Json::object(result)))
   assert_true(success.contains("\"type\":\"success\""))
   assert_true(success.contains("\"id\":1"))
   assert_true(success.contains("\"ready\":true"))
 
-  let error = error_response_to_json(2, "invalid argument", "bad input")
+  let error = @bidi.error_response_to_json(2, "invalid argument", "bad input")
   assert_true(error.contains("\"type\":\"error\""))
   assert_true(error.contains("\"error\":\"invalid argument\""))
   assert_true(error.contains("\"message\":\"bad input\""))
   assert_true(error.contains("\"stacktrace\":\"\""))
 
-  let params : Map[String, Json] = {}
+  let params : Map[String, Json] = Map([])
   params["context"] = Json::string("ctx-1")
-  let event = event_to_json(
+  let event = @bidi.event_to_json(
     "browsingContext.contextCreated",
     Json::object(params),
   )
@@ -63,7 +63,7 @@ test "codec serializes success error and event envelopes" {
 
 ///|
 test "parse_incoming parses valid success response" {
-  let parsed = parse_incoming(
+  let parsed = @bidi.parse_incoming(
     "{\"id\":1,\"type\":\"success\",\"result\":{\"ok\":true}}",
   )
   match parsed {
@@ -80,7 +80,7 @@ test "parse_incoming parses valid success response" {
 
 ///|
 test "parse_incoming rejects success response without result" {
-  let parsed = parse_incoming("{\"id\":1,\"type\":\"success\"}")
+  let parsed = @bidi.parse_incoming("{\"id\":1,\"type\":\"success\"}")
   match parsed {
     Err(message) => assert_eq(message, "Missing result field")
     _ => assert_true(false)
@@ -89,7 +89,7 @@ test "parse_incoming rejects success response without result" {
 
 ///|
 test "parse_incoming rejects error response without error code" {
-  let parsed = parse_incoming(
+  let parsed = @bidi.parse_incoming(
     "{\"id\":1,\"type\":\"error\",\"message\":\"boom\"}",
   )
   match parsed {
@@ -100,7 +100,7 @@ test "parse_incoming rejects error response without error code" {
 
 ///|
 test "parse_incoming rejects error response without message" {
-  let parsed = parse_incoming(
+  let parsed = @bidi.parse_incoming(
     "{\"id\":1,\"type\":\"error\",\"error\":\"invalid argument\"}",
   )
   match parsed {
@@ -111,7 +111,9 @@ test "parse_incoming rejects error response without message" {
 
 ///|
 test "parse_incoming rejects non-integer id" {
-  let parsed = parse_incoming("{\"id\":1.5,\"type\":\"success\",\"result\":{}}")
+  let parsed = @bidi.parse_incoming(
+    "{\"id\":1.5,\"type\":\"success\",\"result\":{}}",
+  )
   match parsed {
     Err(message) => assert_eq(message, "Invalid id field")
     _ => assert_true(false)
@@ -120,7 +122,7 @@ test "parse_incoming rejects non-integer id" {
 
 ///|
 test "parse_incoming rejects event with non-object params" {
-  let parsed = parse_incoming(
+  let parsed = @bidi.parse_incoming(
     "{\"type\":\"event\",\"method\":\"log.entryAdded\",\"params\":1}",
   )
   match parsed {

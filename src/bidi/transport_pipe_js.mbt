@@ -1,6 +1,9 @@
 ///| Chrome BiDi Pipe Transport (JS target)
+
 ///|
+
 ///| Launches Chrome with --remote-debugging-pipe + --enable-features=WebDriverBiDi
+
 ///| and communicates via stdio fd 3 (write) and fd 4 (read) using null-delimited JSON.
 
 ///|
@@ -37,7 +40,9 @@ async fn ensure_chrome_pipe_connected(
 // =============================================================================
 
 ///|
-extern "js" fn ffi_launch_chrome_pipe(headless : Bool) -> @js_async.Promise[Int] =
+extern "js" fn ffi_launch_chrome_pipe(
+  headless : Bool,
+) -> @js_async.Promise[Int] =
   #| async (headless) => {
   #|   const { spawn } = await import('node:child_process');
   #|   const { existsSync } = await import('node:fs');
