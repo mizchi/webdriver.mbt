@@ -4,7 +4,7 @@
 ///|
 /// Serialize request to JSON string
 pub fn BidiRequest::to_json(self : BidiRequest) -> String {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["id"] = Json::number(self.id.to_double())
   obj["method"] = Json::string(self.method_name)
   match self.params {
@@ -39,13 +39,13 @@ fn parse_request_map(map : Map[String, Json]) -> Result[BidiRequest, String] {
     Some(String(method_name)) => method_name
     _ => return Err("Missing method field")
   }
-  Ok({ id, method_name, params: map.get("params") })
+  Ok({ id, method_name, params: map.get("params"), })
 }
 
 ///|
 /// Serialize a WebDriver BiDi success response envelope.
 pub fn success_response_to_json(id : Int, result : Json?) -> String {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["id"] = Json::number(id.to_double())
   obj["type"] = Json::string("success")
   match result {
@@ -73,7 +73,7 @@ pub fn error_response_to_json_with_stacktrace(
   message : String,
   stacktrace : String,
 ) -> String {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["id"] = Json::number(id.to_double())
   obj["type"] = Json::string("error")
   obj["error"] = Json::string(code)
@@ -138,14 +138,14 @@ fn parse_response(map : Map[String, Json]) -> Result[BidiIncoming, String] {
       Some(String(s)) => s
       _ => ""
     }
-    let err : BidiError = { error, message, stacktrace }
-    Ok(BidiIncoming::Response({ id, result: None, error: Some(err) }))
+    let err : BidiError = { error, message, stacktrace, }
+    Ok(BidiIncoming::Response({ id, result: None, error: Some(err), }))
   } else {
     let result = match map.get("result") {
       Some(value) => value
       None => return Err("Missing result field")
     }
-    Ok(BidiIncoming::Response({ id, result: Some(result), error: None }))
+    Ok(BidiIncoming::Response({ id, result: Some(result), error: None, }))
   }
 }
 
@@ -161,7 +161,7 @@ fn parse_event(map : Map[String, Json]) -> Result[BidiIncoming, String] {
     Some(_) => return Err("Invalid params field")
     None => Json::object({})
   }
-  Ok(BidiIncoming::Event({ event_method: method_name, params }))
+  Ok(BidiIncoming::Event({ event_method: method_name, params, }))
 }
 
 ///|

@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/webdriver/bidi"
 
+import {
+  "moonbitlang/core/ref",
+}
+
 // Values
 pub fn error_response_to_json(Int, String, String) -> String
 
@@ -22,6 +26,8 @@ pub struct AccessibilityLocator {
   name : String?
   exact : Bool?
 }
+pub fn AccessibilityLocator::output(Self, &Logger) -> Unit
+pub fn AccessibilityLocator::to_string(Self) -> String
 pub impl Show for AccessibilityLocator
 
 pub enum ActionOrigin {
@@ -32,8 +38,10 @@ pub enum ActionOrigin {
 }
 pub fn ActionOrigin::element_handle(String) -> Self
 pub fn ActionOrigin::element_shared_id(String) -> Self
+pub fn ActionOrigin::output(Self, &Logger) -> Unit
 pub fn ActionOrigin::pointer() -> Self
 pub fn ActionOrigin::to_json(Self) -> Json
+pub fn ActionOrigin::to_string(Self) -> String
 pub fn ActionOrigin::viewport() -> Self
 pub impl Show for ActionOrigin
 
@@ -45,8 +53,10 @@ pub struct ActionSequence {
 }
 pub fn ActionSequence::key(String, Array[InputAction]) -> Self
 pub fn ActionSequence::none(String, Array[InputAction]) -> Self
+pub fn ActionSequence::output(Self, &Logger) -> Unit
 pub fn ActionSequence::pointer(String, PointerType, Array[InputAction]) -> Self
 pub fn ActionSequence::to_json(Self) -> Json
+pub fn ActionSequence::to_string(Self) -> String
 pub impl Show for ActionSequence
 
 pub struct Backend {
@@ -66,15 +76,21 @@ pub struct BackendCapabilities {
   element_lookup : Bool
   input_actions : Bool
   screenshot : Bool
-}
-pub impl Eq for BackendCapabilities
+} derive(Eq)
+pub fn BackendCapabilities::equal(Self, Self) -> Bool
+pub fn BackendCapabilities::not_equal(Self, Self) -> Bool
+pub fn BackendCapabilities::output(Self, &Logger) -> Unit
+pub fn BackendCapabilities::to_string(Self) -> String
 pub impl Show for BackendCapabilities
 
 pub enum BackendError {
   InvalidArgument(message~ : String)
   NotFound(message~ : String)
-}
-pub impl Eq for BackendError
+} derive(Eq)
+pub fn BackendError::equal(Self, Self) -> Bool
+pub fn BackendError::not_equal(Self, Self) -> Bool
+pub fn BackendError::output(Self, &Logger) -> Unit
+pub fn BackendError::to_string(Self) -> String
 pub impl Show for BackendError
 
 pub struct BidiClient {
@@ -139,18 +155,24 @@ pub struct BidiError {
   message : String
   stacktrace : String
 }
+pub fn BidiError::output(Self, &Logger) -> Unit
+pub fn BidiError::to_string(Self) -> String
 pub impl Show for BidiError
 
 pub struct BidiEvent {
   event_method : String
   params : Json
 }
+pub fn BidiEvent::output(Self, &Logger) -> Unit
+pub fn BidiEvent::to_string(Self) -> String
 pub impl Show for BidiEvent
 
 pub enum BidiIncoming {
   Response(BidiResponse)
   Event(BidiEvent)
 }
+pub fn BidiIncoming::output(Self, &Logger) -> Unit
+pub fn BidiIncoming::to_string(Self) -> String
 pub impl Show for BidiIncoming
 
 pub struct BidiRequest {
@@ -158,7 +180,9 @@ pub struct BidiRequest {
   method_name : String
   params : Json?
 }
+pub fn BidiRequest::output(Self, &Logger) -> Unit
 pub fn BidiRequest::to_json(Self) -> String
+pub fn BidiRequest::to_string(Self) -> String
 pub impl Show for BidiRequest
 
 pub struct BidiResponse {
@@ -166,6 +190,8 @@ pub struct BidiResponse {
   result : Json?
   error : BidiError?
 }
+pub fn BidiResponse::output(Self, &Logger) -> Unit
+pub fn BidiResponse::to_string(Self) -> String
 pub impl Show for BidiResponse
 
 pub struct CacheBehavior {
@@ -174,8 +200,15 @@ pub struct CacheBehavior {
 pub fn CacheBehavior::bypass() -> Self
 pub fn CacheBehavior::default() -> Self
 pub fn CacheBehavior::new(String) -> Self
+pub fn CacheBehavior::output(Self, &Logger) -> Unit
 pub fn CacheBehavior::to_string(Self) -> String
 pub impl Show for CacheBehavior
+
+pub struct ChromePipeState {
+  headless : Bool
+  proc_id : @ref.Ref[Int?]
+  closed : @ref.Ref[Bool]
+}
 
 pub enum ClientError {
   Transport(TransportError)
@@ -183,6 +216,8 @@ pub enum ClientError {
   InvalidArgument(message~ : String)
   ResponseError(error~ : BidiError)
 }
+pub fn ClientError::output(Self, &Logger) -> Unit
+pub fn ClientError::to_string(Self) -> String
 pub impl Show for ClientError
 
 pub struct CustomTransport {
@@ -194,7 +229,7 @@ pub struct CustomTransport {
 pub fn CustomTransport::new(() -> Result[Unit, TransportError], (String) -> Result[Unit, TransportError], () -> Result[String, TransportError], () -> Result[Unit, TransportError]) -> Self
 
 pub struct InMemoryBackend {
-  state : Ref[InMemoryBackendState]
+  state : @ref.Ref[InMemoryBackendState]
 }
 pub fn InMemoryBackend::action_log_length(Self) -> Int
 pub fn InMemoryBackend::get_context_url(Self, String) -> String?
@@ -212,16 +247,20 @@ pub struct InnerTextLocator {
   match_type : InnerTextMatchType
   ignore_case : Bool
 }
+pub fn InnerTextLocator::output(Self, &Logger) -> Unit
+pub fn InnerTextLocator::to_string(Self) -> String
 pub impl Show for InnerTextLocator
 
 pub enum InnerTextMatchType {
   Full
   Partial
-}
+} derive(Eq)
+pub fn InnerTextMatchType::equal(Self, Self) -> Bool
 pub fn InnerTextMatchType::full() -> Self
+pub fn InnerTextMatchType::not_equal(Self, Self) -> Bool
+pub fn InnerTextMatchType::output(Self, &Logger) -> Unit
 pub fn InnerTextMatchType::partial() -> Self
 pub fn InnerTextMatchType::to_string(Self) -> String
-pub impl Eq for InnerTextMatchType
 pub impl Show for InnerTextMatchType
 
 pub enum InputAction {
@@ -235,27 +274,31 @@ pub enum InputAction {
 }
 pub fn InputAction::key_down(String) -> Self
 pub fn InputAction::key_up(String) -> Self
+pub fn InputAction::output(Self, &Logger) -> Unit
 pub fn InputAction::pause(duration? : Int) -> Self
 pub fn InputAction::pointer_cancel() -> Self
 pub fn InputAction::pointer_down(Int) -> Self
 pub fn InputAction::pointer_move(Double, Double, origin? : ActionOrigin, duration? : Int?) -> Self
 pub fn InputAction::pointer_up(Int) -> Self
 pub fn InputAction::to_json(Self) -> Json
+pub fn InputAction::to_string(Self) -> String
 pub impl Show for InputAction
 
 pub enum InputSourceType {
   Pointer
   Key
   NoneSource
-}
+} derive(Eq)
+pub fn InputSourceType::equal(Self, Self) -> Bool
+pub fn InputSourceType::not_equal(Self, Self) -> Bool
+pub fn InputSourceType::output(Self, &Logger) -> Unit
 pub fn InputSourceType::to_string(Self) -> String
-pub impl Eq for InputSourceType
 pub impl Show for InputSourceType
 
 pub struct JsWebSocketState {
   url : String
-  socket_id : Ref[Int?]
-  closed : Ref[Bool]
+  socket_id : @ref.Ref[Int?]
+  closed : @ref.Ref[Bool]
 }
 
 pub enum Locator {
@@ -269,7 +312,9 @@ pub fn Locator::accessibility(String, name? : String, exact? : Bool) -> Self
 pub fn Locator::css(String) -> Self
 pub fn Locator::custom(String, Json) -> Self
 pub fn Locator::inner_text(String, match_type? : InnerTextMatchType, ignore_case? : Bool) -> Self
+pub fn Locator::output(Self, &Logger) -> Unit
 pub fn Locator::to_json(Self) -> Json
+pub fn Locator::to_string(Self) -> String
 pub fn Locator::xpath(String) -> Self
 pub impl Show for Locator
 
@@ -277,6 +322,8 @@ pub struct NavigationResult {
   navigation : String
   url : String
 }
+pub fn NavigationResult::output(Self, &Logger) -> Unit
+pub fn NavigationResult::to_string(Self) -> String
 pub impl Show for NavigationResult
 
 pub struct NetworkDataCollector {
@@ -284,31 +331,39 @@ pub struct NetworkDataCollector {
   contexts : Array[String]?
 }
 pub fn NetworkDataCollector::new(Array[String], contexts? : Array[String]) -> Self
+pub fn NetworkDataCollector::output(Self, &Logger) -> Unit
 pub fn NetworkDataCollector::to_json(Self) -> Json
+pub fn NetworkDataCollector::to_string(Self) -> String
 pub impl Show for NetworkDataCollector
 
 pub struct NodeReference {
   handle : String?
   shared_id : String?
 }
+pub fn NodeReference::output(Self, &Logger) -> Unit
+pub fn NodeReference::to_string(Self) -> String
 pub impl Show for NodeReference
 
 pub struct PointerParameters {
   pointer_type : PointerType
 }
+pub fn PointerParameters::output(Self, &Logger) -> Unit
 pub fn PointerParameters::to_json(Self) -> Json
+pub fn PointerParameters::to_string(Self) -> String
 pub impl Show for PointerParameters
 
 pub enum PointerType {
   Mouse
   Pen
   Touch
-}
+} derive(Eq)
+pub fn PointerType::equal(Self, Self) -> Bool
 pub fn PointerType::mouse() -> Self
+pub fn PointerType::not_equal(Self, Self) -> Bool
+pub fn PointerType::output(Self, &Logger) -> Unit
 pub fn PointerType::pen() -> Self
 pub fn PointerType::to_string(Self) -> String
 pub fn PointerType::touch() -> Self
-pub impl Eq for PointerType
 pub impl Show for PointerType
 
 pub struct RemoteValue {
@@ -318,20 +373,24 @@ pub fn RemoteValue::boolean(Bool) -> Self
 pub fn RemoteValue::handle(String) -> Self
 pub fn RemoteValue::null() -> Self
 pub fn RemoteValue::number(Double) -> Self
+pub fn RemoteValue::output(Self, &Logger) -> Unit
 pub fn RemoteValue::shared_id(String) -> Self
 pub fn RemoteValue::string(String) -> Self
 pub fn RemoteValue::to_json(Self) -> Json
+pub fn RemoteValue::to_string(Self) -> String
 pub fn RemoteValue::undefined() -> Self
 pub impl Show for RemoteValue
 
 pub enum ResultOwnership {
   NoneOwnership
   Root
-}
+} derive(Eq)
+pub fn ResultOwnership::equal(Self, Self) -> Bool
 pub fn ResultOwnership::none() -> Self
+pub fn ResultOwnership::not_equal(Self, Self) -> Bool
+pub fn ResultOwnership::output(Self, &Logger) -> Unit
 pub fn ResultOwnership::root() -> Self
 pub fn ResultOwnership::to_string(Self) -> String
-pub impl Eq for ResultOwnership
 pub impl Show for ResultOwnership
 
 pub struct SerializationOptions {
@@ -340,26 +399,34 @@ pub struct SerializationOptions {
   include_shadow_tree : String?
 }
 pub fn SerializationOptions::new(max_depth? : Int, max_object_depth? : Int, include_shadow_tree? : String) -> Self
+pub fn SerializationOptions::output(Self, &Logger) -> Unit
 pub fn SerializationOptions::to_json(Self) -> Json
+pub fn SerializationOptions::to_string(Self) -> String
 pub impl Show for SerializationOptions
 
 pub struct SessionInfo {
   session_id : String
   capabilities : Json?
 }
+pub fn SessionInfo::output(Self, &Logger) -> Unit
+pub fn SessionInfo::to_string(Self) -> String
 pub impl Show for SessionInfo
 
 pub struct SessionStatus {
   ready : Bool
   message : String?
 }
+pub fn SessionStatus::output(Self, &Logger) -> Unit
+pub fn SessionStatus::to_string(Self) -> String
 pub impl Show for SessionStatus
 
 pub enum Transport {
   JsWebSocket(JsWebSocketState)
+  ChromePipe(ChromePipeState)
   Custom(CustomTransport)
   Unsupported(TransportError)
 }
+pub fn Transport::chrome_bidi_pipe(headless? : Bool) -> Self
 pub fn Transport::close(Self) -> Result[Unit, TransportError]
 pub async fn Transport::connect(Self) -> Result[Unit, TransportError]
 pub fn Transport::custom(CustomTransport) -> Self
@@ -373,9 +440,10 @@ pub enum TransportError {
   NetworkError(message~ : String)
   Closed
 }
+pub fn TransportError::output(Self, &Logger) -> Unit
+pub fn TransportError::to_string(Self) -> String
 pub impl Show for TransportError
 
 // Type aliases
 
 // Traits
-

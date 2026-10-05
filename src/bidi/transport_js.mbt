@@ -12,7 +12,7 @@ pub struct JsWebSocketState {
 ///|
 /// Create JS WebSocket state
 fn JsWebSocketState::new(url : String) -> JsWebSocketState {
-  { url, socket_id: { val: None }, closed: { val: false } }
+  { url, socket_id: { val: None, }, closed: { val: false, }, }
 }
 
 ///|

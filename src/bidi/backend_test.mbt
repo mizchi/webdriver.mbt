@@ -24,7 +24,7 @@ fn backend_get_number_field(json : Json, key : String) -> Double? {
 
 ///|
 test "in-memory backend reports capabilities" {
-  let backend_impl = InMemoryBackend::new()
+  let backend_impl = @bidi.InMemoryBackend::new()
   let backend = backend_impl.to_backend()
   let caps = (backend.capabilities)()
   assert_true(caps.navigation)
@@ -36,7 +36,7 @@ test "in-memory backend reports capabilities" {
 
 ///|
 test "in-memory backend navigate and evaluate update state" {
-  let backend_impl = InMemoryBackend::new(initial_contexts=["ctx-1"])
+  let backend_impl = @bidi.InMemoryBackend::new(initial_contexts=["ctx-1"])
   let backend = backend_impl.to_backend()
   let navigate_result = (backend.navigate)(
     "ctx-1", "https://example.com", "complete",
@@ -61,11 +61,11 @@ test "in-memory backend navigate and evaluate update state" {
 
 ///|
 test "in-memory backend locate nodes returns typed node references" {
-  let backend_impl = InMemoryBackend::new(initial_contexts=["ctx-1"])
+  let backend_impl = @bidi.InMemoryBackend::new(initial_contexts=["ctx-1"])
   let backend = backend_impl.to_backend()
   let result = (backend.locate_nodes)(
     "ctx-1",
-    Locator::css("body").to_json(),
+    @bidi.Locator::css("body").to_json(),
     Some(2),
   )
   match result {
@@ -81,7 +81,7 @@ test "in-memory backend locate nodes returns typed node references" {
 
 ///|
 test "in-memory backend input/screenshot and errors" {
-  let backend_impl = InMemoryBackend::new(initial_contexts=["ctx-1"])
+  let backend_impl = @bidi.InMemoryBackend::new(initial_contexts=["ctx-1"])
   let backend = backend_impl.to_backend()
   let actions = [Json::object({ "type": Json::string("key") })]
   let perform = (backend.perform_actions)(Some("ctx-1"), actions)

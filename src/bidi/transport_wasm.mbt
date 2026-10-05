@@ -30,7 +30,6 @@ fn wasm_not_supported() -> TransportError {
 async fn async_marker() -> Unit {
   let tasks : Array[async () -> Unit] = []
   let _ = @async.all(tasks[:])
-
 }
 
 ///|

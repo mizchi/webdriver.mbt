@@ -420,8 +420,8 @@ fn e2e_make_number_arg(value : Double) -> Json {
 async test "bidi e2e" {
   let port = @js_async.Promise::wait(ws_server_start(0))
   let url = "ws://127.0.0.1:" + port.to_string()
-  let transport = Transport::websocket(url)
-  let client = BidiClient::new(transport)
+  let transport = @bidi.Transport::websocket(url)
+  let client = @bidi.BidiClient::new(transport)
   let status = client.session_status()
   match status {
     Ok(s) => assert_true(s.ready)
@@ -429,14 +429,14 @@ async test "bidi e2e" {
   }
   let session_info = client.session_new()
   match session_info {
-    Ok(info) => assert_true(!(info.session_id.is_empty()))
+    Ok(info) => assert_true(!info.session_id.is_empty())
     Err(_) => assert_true(false)
   }
   let user_context = match client.browser_create_user_context() {
     Ok(value) => value
     Err(_) => ""
   }
-  assert_true(!(user_context.is_empty()))
+  assert_true(!user_context.is_empty())
   let contexts = client.browser_get_user_contexts()
   match contexts {
     Ok(list) => assert_true(list.length() >= 2)
@@ -446,7 +446,7 @@ async test "bidi e2e" {
     Ok(v) => v
     Err(_) => ""
   }
-  assert_true(!(ctx.is_empty()))
+  assert_true(!ctx.is_empty())
   let tree = client.browsing_context_get_tree()
   match tree {
     Ok(json) =>
@@ -477,7 +477,7 @@ async test "bidi e2e" {
   }
   let locate_nodes_refs = client.browsing_context_locate_nodes_typed_refs(
     ctx,
-    Locator::css("body"),
+    @bidi.Locator::css("body"),
   )
   match locate_nodes_refs {
     Ok(nodes) => {
@@ -505,7 +505,7 @@ async test "bidi e2e" {
   }
   let screenshot = client.browsing_context_capture_screenshot(ctx)
   match screenshot {
-    Ok(data) => assert_true(!(data.is_empty()))
+    Ok(data) => assert_true(!data.is_empty())
     Err(_) => assert_true(false)
   }
   let args : Array[Json] = [e2e_make_number_arg(6.0), e2e_make_number_arg(7.0)]
@@ -530,8 +530,10 @@ async test "bidi e2e" {
       }
     Err(_) => assert_true(false)
   }
-  let events : Ref[Array[String]] = { val: [] }
-  client.on_event(fn(evt : BidiEvent) { events.val.push(evt.event_method) })
+  let events : Ref[Array[String]] = { val: [], }
+  client.on_event(fn(evt : @bidi.BidiEvent) {
+    events.val.push(evt.event_method)
+  })
   let _ = client.session_subscribe(["browsingContext.load"])
   assert_true(events.val.contains("browsingContext.load"))
   let _ = client.session_unsubscribe(["browsingContext.load"])
